@@ -1,0 +1,22 @@
+* text=auto
+
+# Source, metadata and serialized Unity scene data.
+*.cs           text eol=lf
+*.asmdef       text eol=lf
+*.inputactions text eol=lf
+*.meta         text eol=lf
+*.unity        text eol=lf
+*.prefab       text eol=lf
+*.mat          text eol=lf
+*.json         text eol=lf
+*.md           text eol=lf
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+
+# .asset files may contain either YAML or binary data. Use Git's auto detection.
+*.png          binary
+*.jpg          binary
+*.fbx          binary
+*.blend        binary
+*.wav          binary
+*.ogg          binary

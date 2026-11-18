@@ -1,0 +1,21 @@
+{
+    "name": "ZombieYard.Tests.EditMode",
+    "references": [
+        "ZombieYard.Runtime",
+        "UnityEngine.TestRunner",
+        "VContainer",
+        "Unity.InputSystem",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ]
+}

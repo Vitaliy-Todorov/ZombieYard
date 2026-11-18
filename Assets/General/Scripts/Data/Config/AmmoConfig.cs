@@ -1,0 +1,17 @@
+using UnityEngine;
+
+namespace ZombieYard
+{
+    [CreateAssetMenu(menuName = "Zombie Yard/Ammo")]
+    public sealed class AmmoConfig : ScriptableObject
+    {
+        public string title;
+        [Min(1)] public int damage = 12;
+        [Min(1)] public int projectiles = 6;
+        [Range(0, 30)] public float spreadDegrees = 4;
+        [Min(1)] public float range = 45;
+        [Min(1)] public float speed = 36;
+        public ShotProjectile projectilePrefab;
+        public GameObject pickupVisual;
+    }
+}

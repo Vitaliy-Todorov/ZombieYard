@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 407d48154c61e7941a7d789ec9cf4fb5, type: 3}
+  m_Name: Survivor
+  m_EditorClassIdentifier: ZombieYard.Runtime::ZombieYard.PlayerConfig
+  hp: 100
+  walk: 4
+  sprint: 6.8
+  jumpHeight: 1.55
+  pickupReach: 2.8
+  slotCount: 3
+  startingWeapons:
+  - {fileID: 11400000, guid: d1d2a30a75e9d1f41979806e497bc32b, type: 2}
+  - {fileID: 11400000, guid: 61b786062549f3c42b77eaef15626cd2, type: 2}
+  fists: {fileID: 11400000, guid: eb1f9f0b9f6857d4f96aec16dd86ec6e, type: 2}
+  startingReserve:
+  - ammo: {fileID: 11400000, guid: d24f361a1ddffaf489014811010a22f3, type: 2}
+    count: 15
+  - ammo: {fileID: 11400000, guid: 8d89e37f0a6269e48b5f5e7a38c9f386, type: 2}
+    count: 4

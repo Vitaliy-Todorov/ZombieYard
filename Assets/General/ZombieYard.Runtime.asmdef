@@ -1,0 +1,8 @@
+{
+    "name": "ZombieYard.Runtime",
+    "rootNamespace": "ZombieYard",
+    "references": [
+        "VContainer",
+        "Unity.InputSystem"
+    ]
+}

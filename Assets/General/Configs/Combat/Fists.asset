@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26f314c5520a60c4a9cb3a88e919616b, type: 3}
+  m_Name: Fists
+  m_EditorClassIdentifier: ZombieYard.Runtime::ZombieYard.WeaponConfig
+  title: "\u041A\u0443\u043B\u0430\u043A\u0438"
+  delay: 0.35
+  melee: {fileID: 11400000, guid: 77b536b999fd3174f89a024246a2719e, type: 2}
+  compatibleAmmo: []
+  capacity: 0
+  reloadSeconds: 1.3
+  visual: {fileID: 3224772774741706864, guid: bbfc8cb84876c68459052fedbc6a1426, type: 3}

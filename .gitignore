@@ -1,0 +1,38 @@
+# Unity regenerates these directories for each working copy.
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/[Cc]odeCoverage/
+/[Tt]est[Rr]esults/
+/[Tt]est[Rr]esults.xml
+/sysinfo.txt
+*.stackdump
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+
+# Local player builds, including Builds/Windows/ZombieYard.exe.
+/[Bb]uild/
+/[Bb]uilds/
+/ExportedObj/
+
+# Unity-generated solutions and projects. Keep hand-authored tooling elsewhere.
+/*.csproj
+/*.sln
+/*.slnx
+/*.unityproj
+/.vs/
+/.idea/
+*.csproj.user
+*.suo
+*.userprefs
+*.DotSettings.user
+
+# Operating system and local agent settings.
+.DS_Store
+Thumbs.db
+[Dd]esktop.ini
+/.claude/settings.local.json

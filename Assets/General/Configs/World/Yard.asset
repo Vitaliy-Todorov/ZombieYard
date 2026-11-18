@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3081d1fde3643ff4e87eda2295a6c518, type: 3}
+  m_Name: Yard
+  m_EditorClassIdentifier: ZombieYard.Runtime::ZombieYard.WorldConfig
+  halfSize: {x: 10, y: 8}
+  blockSize: 1.25
+  soil: {fileID: 11400000, guid: 81804fcb1d9b79749b36f99bcb89a573, type: 2}
+  fence: {fileID: 11400000, guid: d49434dc7f5016440b32669e78958396, type: 2}
+  masonry: {fileID: 11400000, guid: 51d7a036592954649b3735b3ac6e160e, type: 2}
+  supplyCrate: {fileID: 11400000, guid: dc387f0e945f66744af3e16dfe6aa576, type: 2}
+  pitFloorMaterial: {fileID: 2100000, guid: 65702de16795f21459abaace7066feb3, type: 2}

@@ -21,6 +21,31 @@ namespace ZombieYard
             return pickup;
         }
 
+        public static bool TryThrow(HeldWeapon weapon, CharacterController holder, Vector3 forward)
+        {
+            Vector3 chest = holder.transform.TransformPoint(holder.center);
+            var pickup = ForWeapon(weapon, chest);
+            var box = pickup.GetComponent<BoxCollider>();
+            box.enabled = false;
+            Vector3 half = box.size * .5f;
+            float clearance = Vector3.Dot(half, new Vector3(Mathf.Abs(forward.x), 0, Mathf.Abs(forward.z)));
+            float reach = holder.radius + clearance + .12f;
+            Vector3 center = chest + forward * reach;
+            var hits = Physics.BoxCastAll(chest, half, forward, Quaternion.identity, reach,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            if (System.Array.Exists(hits, hit => hit.collider != holder) ||
+                Physics.CheckBox(center, half, Quaternion.identity, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                pickup.gameObject.SetActive(false);
+                Destroy(pickup.gameObject);
+                return false;
+            }
+            pickup.transform.position = center - box.center;
+            box.enabled = true;
+            pickup.GetComponent<Rigidbody>().linearVelocity = forward * 2.8f + Vector3.up * .8f;
+            return true;
+        }
+
         public static Pickup ForAmmo(AmmoConfig ammo, int count, Vector3 position)
         {
             var pickup = Create(ammo.pickupVisual, position, false);

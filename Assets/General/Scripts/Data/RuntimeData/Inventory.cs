@@ -38,7 +38,7 @@ namespace ZombieYard
 
         public Inventory(PlayerConfig config)
         {
-            Slots = new HeldWeapon[Mathf.Max(1, config.slotCount)];
+            Slots = new HeldWeapon[PlayerConfig.WeaponSlots];
             fists = new HeldWeapon(config.fists);
             foreach (var weapon in config.startingWeapons)
                 if (weapon) Take(new HeldWeapon(weapon));

@@ -15,6 +15,7 @@ namespace ZombieYard
     {
         [Min(1)] public int hp = 65;
         [Min(.1f)] public float speed = 1.65f, maxClimbHeight = 1.55f, climbDuration = .85f;
+        [Min(1)] public float turnSpeed = 540;
         public WeaponConfig weapon;
         public LootEntry[] loot;
     }

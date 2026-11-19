@@ -12,7 +12,9 @@ namespace ZombieYard
             var supply = scene.riflePosition.position;
             scene.grid.Build(scene.world, supply);
             Physics.SyncTransforms();
-            scene.player.Initialize(-scene.grid.Size - 6f);
+            scene.player.Initialize(scene.grid.VoidHeight);
+            scene.player.Fog = new GameObject("Exterior fog").AddComponent<ExteriorFog>();
+            scene.player.Fog.Initialize(scene.world, scene.grid, scene.player);
             supply.y = Mathf.Max(supply.y, scene.grid.Height(scene.grid.Cell(supply)) + .22f);
             Pickup.ForWeapon(new HeldWeapon(scene.rifle), supply);
         }

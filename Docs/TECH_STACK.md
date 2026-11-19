@@ -4,7 +4,7 @@
 
 | Уже есть в ZombieYard | Версия | Роль в проекте |
 | --- | --- | --- |
-| Universal RP · `com.unity.render-pipelines.universal` | 17.3.0 | Рендер участка и оружия с существующими профилями проекта |
+| Universal RP · `com.unity.render-pipelines.universal` | 17.3.0 | Рендер участка и оружия. ExteriorFog использует текстуру глубины камеры URP |
 | Input System · `com.unity.inputsystem` | 1.20.0 | Ввод от первого лица. В карте Player уже есть Move, Look, Attack, Interact, Jump, Previous, Next и Sprint |
 | VContainer · `jp.hadashikick.vcontainer` | 1.19.0, Git-тег | Сборка зависимостей сцены и время жизни сервиса спавна |
 | AI Navigation · `com.unity.ai.navigation` | 2.0.14 | Пакет установлен. В игровом прототипе маршрут рассчитывает YardGrid по высотам ячеек участка |

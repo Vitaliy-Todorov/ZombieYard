@@ -9,6 +9,17 @@ namespace ZombieYard
         public Vector2Int halfSize = new Vector2Int(10, 8);
         [Min(.25f)] public float blockSize = 1.25f;
         public BlockConfig soil, fence, masonry, supplyCrate;
-        public Material pitFloorMaterial;
+        [Min(1)] public int plateauHeight = 5;
+        [Min(10)] public int mountainDistance = 44;
+        [Min(1)] public int fogDepthBelowYard = 2;
+        [Min(.02f)] public float fogFlowInterval = .12f;
+        [Min(2)] public int subsoilDepth = 3;
+        [UnityEngine.Serialization.FormerlySerializedAs("pitFloorMaterial")]
+        public Material terrainMaterial;
+        public Shader exteriorFogShader;
+        public Color fogColor = new(.55f, .66f, .56f);
+        [Min(.01f)] public float fogDensity = .13f;
+        [Min(1)] public int fogDamage = 8;
+        [Min(.05f)] public float fogInterval = 1;
     }
 }

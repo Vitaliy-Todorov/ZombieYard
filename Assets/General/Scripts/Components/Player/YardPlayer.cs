@@ -19,6 +19,7 @@ namespace ZombieYard
         public float HitUntil { get; private set; }
         public float HurtUntil { get; private set; }
         public string Notice { get; private set; }
+        public ExteriorFog Fog { get; internal set; }
         public bool Paused { get; private set; }
 
         private CharacterController body;
@@ -108,7 +109,6 @@ namespace ZombieYard
 
             if (keys != null && keys.digit1Key.wasPressedThisFrame) Gear.Select(0);
             else if (keys != null && keys.digit2Key.wasPressedThisFrame) Gear.Select(1);
-            else if (keys != null && keys.digit3Key.wasPressedThisFrame) Gear.Select(2);
             else
             {
                 float wheel = Mouse.current?.scroll.ReadValue().y ?? 0;
@@ -124,17 +124,27 @@ namespace ZombieYard
             }
             if (input["Drop"].WasPressedThisFrame())
             {
-                var dropped = Gear.Drop();
-                if (dropped != null)
-                    Pickup.ForWeapon(dropped, transform.position + Vector3.up * 1.1f + transform.forward * .6f);
+                var weapon = Gear.Slots[Gear.Selected];
+                if (weapon != null)
+                {
+                    if (Pickup.TryThrow(weapon, body, transform.forward))
+                    {
+                        Gear.Drop();
+                        Message("Выброшено · " + weapon.Config.title);
+                    }
+                    else Message("Мало места для броска");
+                }
             }
             if (input["Reload"].WasPressedThisFrame()) Gear.StartReload(Time.time);
             ShowWeapon();
             if (input["Attack"].IsPressed()) Attack();
-            kick = Mathf.MoveTowards(kick, 0, Time.deltaTime * 4);
+            float cycle = Mathf.Min(.36f, shown.delay);
+            kick = Mathf.MoveTowards(kick, 0, Time.deltaTime / (shown.diggingMotion ? cycle : .25f));
             float bob = Mathf.Sin(Elapsed * speed * 1.9f) * move.magnitude * .012f;
-            hand.localPosition = rest + new Vector3(bob, Mathf.Abs(bob) - (Gear.Reloading ? .13f : 0), -kick * .09f);
-            hand.localRotation = Quaternion.Euler((Gear.Active.Config.UsesAmmo ? -10 : 38) * kick + (Gear.Reloading ? 24 : 0), -6, -3);
+            float reach = shown.diggingMotion ? .32f * Mathf.Sin(Mathf.PI * kick) : -kick * .09f;
+            float swing = shown.diggingMotion ? 0 : (shown.UsesAmmo ? -10 : 38) * kick;
+            hand.localPosition = rest + new Vector3(bob, Mathf.Abs(bob) - (Gear.Reloading ? .13f : 0), reach);
+            hand.localRotation = Quaternion.Euler(swing + (Gear.Reloading ? 24 : 0), -6, -3);
         }
 
         private void Move(Vector3 horizontal, bool jump)
@@ -201,6 +211,7 @@ namespace ZombieYard
         private void ShowWeapon()
         {
             if (Gear.Active.Config == shown) return;
+            kick = 0;
             shown = Gear.Active.Config;
             if (model) Destroy(model);
             model = Instantiate(shown.visual, hand);
@@ -226,7 +237,7 @@ namespace ZombieYard
                 if (Physics.Raycast(view.position, view.forward, out var hit, held.Config.melee.range,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 {
-                    var target = hit.collider.GetComponentInParent<Health>();
+                    var target = Health.AtHit(hit);
                     if (target && target != Health) { target.Damage(held.Config.melee.damage); MarkHit(); }
                 }
                 return;

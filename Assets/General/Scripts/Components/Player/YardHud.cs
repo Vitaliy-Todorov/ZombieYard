@@ -75,6 +75,7 @@ namespace ZombieYard
                 Color cross = Time.time < player.HitUntil ? Amber : Paper;
                 Fill(x - 7, y, 4, 2, cross); Fill(x + 4, y, 4, 2, cross);
                 Fill(x, y - 7, 2, 4, cross); Fill(x, y + 4, 2, 4, cross);
+                if (player.Fog && player.Fog.Exposed) Text(x - 175, y - 70, 350, 30, "Опасный туман · поднимитесь выше", 17, Amber, true, true);
                 string prompt = player.Notice ?? (player.Nearby ? "E   /   Подобрать · " + player.Nearby.Title : null);
                 if (prompt != null)
                 {
@@ -84,7 +85,7 @@ namespace ZombieYard
                 if (player.Elapsed < 14)
                 {
                     Fill(w / 2 - 292, h - 128, 584, 36, Ink);
-                    Text(w / 2 - 292, h - 128, 584, 36, "WASD  Ходьба     Shift  Бег     ЛКМ  Атака     E  Взять оружие     R  Зарядить     Esc  Помощь", 13, Paper, false, true);
+                    Text(w / 2 - 292, h - 128, 584, 36, "1 / 2  Слот     ЛКМ  Атака     E  Подобрать     G  Выбросить     R  Зарядить     Esc  Помощь", 13, Paper, false, true);
                 }
                 if (Time.time < player.HurtUntil) Fill(0, 0, w, h, new Color(.86f,.12f,.03f, (player.HurtUntil - Time.time) * .75f));
             }
@@ -100,7 +101,7 @@ namespace ZombieYard
                 {
                     Text(x, y + 66, 432, 25, "WASD — ходьба   ·   Shift — бег   ·   Пробел — прыжок", 15, Paper, false, true);
                     Text(x, y + 93, 432, 25, "ЛКМ — атака   ·   R — зарядить   ·   E — взять оружие", 15, Paper, false, true);
-                    Text(x, y + 120, 432, 25, "1–3 или колесо — слоты   ·   G — бросить оружие", 15, Paper, false, true);
+                    Text(x, y + 120, 432, 25, "1–2 или колесо — слоты   ·   G — бросить оружие", 15, Paper, false, true);
                 }
                 if (GUI.Button(new Rect(x + 86, y + 159, 260, 42), hp.Current == 0 ? "Ещё попытка   [R]" : "Продолжить   [Esc]", button))
                 {

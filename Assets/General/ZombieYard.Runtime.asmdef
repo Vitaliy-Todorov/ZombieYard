@@ -3,6 +3,7 @@
     "rootNamespace": "ZombieYard",
     "references": [
         "VContainer",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.RenderPipelines.Universal.Runtime"
     ]
 }

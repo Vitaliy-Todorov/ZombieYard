@@ -30,7 +30,7 @@ namespace ZombieYard
             Vector3 position = point.position;
             float height = scene.grid.Height(scene.grid.Cell(position));
             if (float.IsNegativeInfinity(height)) return;
-            position.y = Mathf.Max(height, position.y);
+            position.y = height;
             var zombie = Object.Instantiate(scene.spawn.prefab, position, point.rotation);
             living.Add(zombie);
             zombie.Initialize(scene.spawn.zombie, scene.grid, scene.player, OnDeath);

@@ -49,7 +49,7 @@ namespace ZombieYard
                 impacted = true;
                 transform.SetPositionAndRotation(hit.point + hit.normal * .012f, Quaternion.LookRotation(hit.normal));
                 transform.localScale = new Vector3(.12f, .12f, .025f);
-                var target = hit.collider.GetComponentInParent<Health>();
+                var target = Health.AtHit(hit);
                 if (target && target.Current > 0)
                 {
                     target.Damage(ammo.damage);

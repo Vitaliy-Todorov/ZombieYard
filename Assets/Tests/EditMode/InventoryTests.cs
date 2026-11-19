@@ -17,9 +17,10 @@ namespace ZombieYard.Tests
             int initial = inventory.Stock(ammo);
             shotgun.Fire();
             inventory.StartReload(0);
-            inventory.Select(2);
+            Assert.AreEqual(2, inventory.Slots.Length);
+            inventory.Select(0);
             inventory.Tick(10);
-            Assert.AreSame(config.fists, inventory.Active.Config);
+            Assert.AreSame(config.startingWeapons[0], inventory.Active.Config);
             Assert.AreEqual(initial, inventory.Stock(ammo));
             Assert.AreEqual(2, shotgun.Loaded);
             inventory.Select(1);

@@ -10,6 +10,9 @@ namespace ZombieYard
         public event Action Died;
         public event Action Hurt;
 
+        public static Health AtHit(RaycastHit hit) =>
+            hit.collider.TryGetComponent<YardChunk>(out var chunk) ? chunk.TargetAt(hit) : hit.collider.GetComponentInParent<Health>();
+
         public void Initialize(int maximum) => Current = Maximum = Mathf.Max(1, maximum);
 
         public void Damage(int amount)

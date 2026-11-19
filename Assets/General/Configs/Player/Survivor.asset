@@ -17,7 +17,6 @@ MonoBehaviour:
   sprint: 6.8
   jumpHeight: 1.55
   pickupReach: 2.8
-  slotCount: 3
   startingWeapons:
   - {fileID: 11400000, guid: d1d2a30a75e9d1f41979806e497bc32b, type: 2}
   - {fileID: 11400000, guid: 61b786062549f3c42b77eaef15626cd2, type: 2}

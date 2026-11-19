@@ -6,91 +6,194 @@ namespace ZombieYard
     public sealed class YardGrid : MonoBehaviour
     {
         private static readonly Vector2Int[] Neighbors = { Vector2Int.up, Vector2Int.right, Vector2Int.down, Vector2Int.left };
-        private readonly HashSet<Vector3Int> blocks = new();
+        private readonly Dictionary<Vector3Int, Voxel> blocks = new();
+        private readonly Dictionary<Vector3Int, Health> damaged = new();
+        private readonly Dictionary<Vector2Int, int> tops = new();
+        private readonly Dictionary<Vector2Int, YardChunk> chunks = new();
         private readonly Dictionary<Vector2Int, Vector2Int> next = new();
         private readonly Queue<Vector2Int> frontier = new();
         private Vector2Int lastTarget;
         private bool dirty = true;
-        private MaterialPropertyBlock tint;
         private float lastClimb;
-        private Vector2Int groundExtent;
+        private int soilHp, woodHp, brickHp, crateHp;
+        private Material material;
+        private Texture2D atlas;
+        private Vector2Int halfSize;
+        internal int Bottom { get; private set; }
+        public float VoidHeight => (Bottom - 4) * Size;
         public float Size { get; private set; }
+        internal Vector2Int Extent { get; private set; }
+        internal event System.Action<Vector3Int> BlockRemoved;
+        public Vector2 SafeExtent => new Vector2(halfSize.x + .5f, halfSize.y + .5f) * Size;
 
         public void Build(WorldConfig config, Vector3 supplyPosition)
         {
-            tint = new MaterialPropertyBlock();
+            soilHp = config.soil.hp;
+            woodHp = config.fence.hp;
+            brickHp = config.masonry.hp;
+            crateHp = config.supplyCrate ? config.supplyCrate.hp : 0;
             Size = config.blockSize;
             int w = Mathf.Max(4, config.halfSize.x), d = Mathf.Max(4, config.halfSize.y);
-            groundExtent = new Vector2Int(w + 4, d + 4);
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            floor.name = "Packed subsoil";
-            floor.transform.SetParent(transform, false);
-            floor.transform.position = new Vector3(0, -1.5f * Size, 0);
-            floor.transform.localScale = new Vector3(2 * groundExtent.x + 1, 1, 2 * groundExtent.y + 1) * Size;
-            floor.GetComponent<MeshRenderer>().sharedMaterial = config.pitFloorMaterial;
-            for (int x = -w - 4; x <= w + 4; x++)
-            for (int z = -d - 4; z <= d + 4; z++)
-            {
-                Place(config.soil, x, -1, z, 0);
-                bool side = Mathf.Abs(x) == w && Mathf.Abs(z) <= d;
-                bool end = Mathf.Abs(z) == d && Mathf.Abs(x) <= w;
-                if (side || end) Place(config.fence, x, 0, z, side ? 90 : 0);
-            }
+            halfSize = new Vector2Int(w, d);
+            int drop = Mathf.Max(1, config.plateauHeight);
+            int ridge = Mathf.Max(drop + 10, config.mountainDistance);
+            int margin = ridge + 10;
+            Extent = halfSize + Vector2Int.one * margin;
+            Bottom = -drop - Mathf.Max(2, config.subsoilDepth) - 1;
 
-            // L-shaped ruined workshop and a low wall leave several approaches.
-            for (int x = -w + 2; x <= -w + 5; x++)
-            for (int y = 0; y < 3; y++)
-                Place(config.masonry, x, y, d - 3, 0);
-            for (int z = d - 5; z < d - 3; z++)
-            for (int y = 0; y < 2; y++)
-                Place(config.masonry, -w + 2, y, z, 90);
-            for (int x = w - 5; x <= w - 3; x++)
-                Place(config.masonry, x, 0, 1, 0);
-            if (config.supplyCrate)
+            var trees = new List<Vector3Int>();
+            for (int x = -w - margin; x <= w + margin; x++)
+            for (int z = -d - margin; z <= d + margin; z++)
             {
-                var supplyCell = Cell(supplyPosition);
-                Place(config.supplyCrate, supplyCell.x, 0, supplyCell.y, 0);
-            }
-        }
-
-        private void Place(BlockConfig config, int x, int y, int z, int angle)
-        {
-            var cell = new Vector3Int(x, y, z);
-            if (!blocks.Add(cell)) return;
-            Vector3 pos = new Vector3(x, y + .5f, z) * Size;
-            var block = Instantiate(config.prefab, pos, Quaternion.Euler(0, angle, 0), transform);
-            block.transform.localScale = Vector3.one * Size;
-            if (y == -1)
-            {
-                var turf = block.transform.Find("Turf");
-                if (turf && turf.TryGetComponent<MeshRenderer>(out var renderer))
+                int outside = Mathf.Max(Mathf.Abs(x) - w, Mathf.Abs(z) - d);
+                int depth = Mathf.Clamp(outside - 1, 0, drop);
+                float distance = new Vector2(Mathf.Max(0, Mathf.Abs(x) - w), Mathf.Max(0, Mathf.Abs(z) - d)).magnitude;
+                float angle = Mathf.Atan2(z, x);
+                float ridgeOffset = 5 * Mathf.Sin(3 * angle) + 2 * Mathf.Sin(5 * angle);
+                float slope = Mathf.Clamp01(1 - Mathf.Abs(distance - ridge - ridgeOffset) / 8);
+                float peaks = Mathf.PerlinNoise((x + 35) * .085f, (z + 79) * .085f);
+                int rise = Mathf.RoundToInt(slope * (8 + 15 * peaks));
+                int surface = -1 - depth + rise;
+                for (int y = Bottom; y <= surface; y++)
+                    Place(y == surface ? Voxel.Turf : Voxel.Earth, x, y, z);
+                if (outside == 0) Place(Voxel.Wood, x, 0, z);
+                if (outside > drop + 4 && x % 5 == 0 && z % 5 == 0)
                 {
-                    float patch = Mathf.PerlinNoise(x * .24f + 42, z * .24f + 17);
-                    Color color = Color.Lerp(new Color(.37f,.39f,.27f), new Color(.55f,.55f,.35f), patch);
-                    tint.SetColor("_BaseColor", color);
-                    renderer.SetPropertyBlock(tint);
+                    float cover = Mathf.PerlinNoise((x + 130) * .18f, (z + 270) * .18f);
+                    if (cover > .43f) trees.Add(new Vector3Int(x, surface + 1, z));
                 }
             }
-            var health = block.GetComponent<Health>();
-            health.Initialize(config.hp);
-            health.Died += () =>
+            // Generate crowns after terrain so foliage never replaces the side of a mountain.
+            foreach (var root in trees)
+                Tree(root.x, root.y, root.z, (root.x + root.z) % 3 == 0 ? 5 : 4);
+
+            for (int x = -w + 2; x <= -w + 5; x++)
+            for (int y = 0; y < 3; y++)
+                Place(Voxel.Brick, x, y, d - 3);
+            for (int z = d - 5; z < d - 3; z++)
+            for (int y = 0; y < 2; y++)
+                Place(Voxel.Brick, -w + 2, y, z);
+            for (int x = w - 5; x <= w - 3; x++) Place(Voxel.Brick, x, 0, 1);
+            if (config.supplyCrate)
             {
-                blocks.Remove(cell);
-                dirty = true;
-                block.SetActive(false);
-                Destroy(block);
-            };
+                var cell = Cell(supplyPosition);
+                Place(Voxel.Crate, cell.x, 0, cell.y);
+            }
+
+            // The old water tower is a landmark on the far side of the northern slope.
+            int towerZ = d + drop + 5;
+            for (int x = 5; x <= 7; x++)
+            for (int z = towerZ - 1; z <= towerZ + 1; z++)
+            {
+                if (x != 6 && z != towerZ)
+                    for (int y = -drop - 1; y < 1; y++) Place(Voxel.Wood, x, y, z);
+                for (int y = 1; y <= 2; y++) Place(Voxel.Metal, x, y, z);
+            }
+
+            atlas = YardAtlas.Create(config);
+            material = new Material(config.terrainMaterial) { name = "Yard voxel atlas" };
+            material.SetTexture("_BaseMap", atlas);
+            material.SetColor("_BaseColor", Color.white);
+            for (int x = ChunkIndex(-w - margin - 1); x <= ChunkIndex(w + margin + 1); x++)
+            for (int z = ChunkIndex(-d - margin - 1); z <= ChunkIndex(d + margin + 1); z++)
+            {
+                var key = new Vector2Int(x, z);
+                var obj = new GameObject($"Chunk {x}, {z}");
+                obj.transform.SetParent(transform, false);
+                var chunk = obj.AddComponent<YardChunk>();
+                chunks.Add(key, chunk);
+                chunk.Initialize(this, key * YardChunk.Width, material);
+            }
         }
 
-        public Vector2Int Cell(Vector3 position) => new(Mathf.RoundToInt(position.x / Size), Mathf.RoundToInt(position.z / Size));
-        public Vector3 Center(Vector2Int cell) => new(cell.x * Size, Height(cell), cell.y * Size);
+        private void Tree(int x, int baseY, int z, int height)
+        {
+            for (int y = 0; y < height; y++) Place(Voxel.Bark, x, baseY + y, z);
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+            {
+                Place(Voxel.Leaves, x + dx, baseY + height - 1, z + dz);
+                if (Mathf.Abs(dx) + Mathf.Abs(dz) < 2) Place(Voxel.Leaves, x + dx, baseY + height, z + dz);
+            }
+        }
 
+        private static int ChunkIndex(int cell) => Mathf.FloorToInt((float)cell / YardChunk.Width);
+        internal Voxel BlockAt(Vector3Int cell) => blocks.GetValueOrDefault(cell);
+        internal int Top(Vector2Int column) => tops.TryGetValue(column, out int y) ? y : Bottom - 1;
+
+        private void Place(Voxel kind, int x, int y, int z)
+        {
+            if (!blocks.TryAdd(new Vector3Int(x, y, z), kind)) return;
+            var column = new Vector2Int(x, z);
+            if (y > Top(column)) tops[column] = y;
+        }
+
+        internal Health HealthAt(Vector3Int cell)
+        {
+            var kind = BlockAt(cell);
+            if (kind == Voxel.Air) return null;
+            if (damaged.TryGetValue(cell, out var existing)) return existing;
+            int hp = kind switch
+            {
+                Voxel.Wood or Voxel.Bark => woodHp,
+                Voxel.Brick or Voxel.Metal => brickHp,
+                Voxel.Crate => crateHp,
+                _ => soilHp
+            };
+            var obj = new GameObject($"Damaged block {cell}");
+            obj.transform.SetParent(transform, false);
+            var health = obj.AddComponent<Health>();
+            health.Initialize(hp);
+            damaged.Add(cell, health);
+            health.Died += () =>
+            {
+                damaged.Remove(cell);
+                Remove(cell);
+                Destroy(obj);
+            };
+            return health;
+        }
+
+        private void Remove(Vector3Int cell)
+        {
+            blocks.Remove(cell);
+            BlockRemoved?.Invoke(cell);
+            var column = new Vector2Int(cell.x, cell.z);
+            if (Top(column) == cell.y)
+            {
+                int y = cell.y - 1;
+                while (y >= Bottom && BlockAt(new Vector3Int(cell.x, y, cell.z)) == Voxel.Air) y--;
+                tops[column] = y;
+                dirty = true;
+            }
+            var owner = new Vector2Int(ChunkIndex(cell.x), ChunkIndex(cell.z));
+            chunks[owner].Rebuild();
+            foreach (var offset in Neighbors)
+            {
+                var other = column + offset;
+                var key = new Vector2Int(ChunkIndex(other.x), ChunkIndex(other.y));
+                if (key != owner && chunks.TryGetValue(key, out var adjacent)) adjacent.Rebuild();
+            }
+        }
+
+        public bool IsOutside(Vector3 position)
+        {
+            var extent = SafeExtent;
+            return Mathf.Abs(position.x) > extent.x || Mathf.Abs(position.z) > extent.y;
+        }
+
+        public Vector2Int Cell(Vector3 position) => new(Mathf.FloorToInt(position.x / Size + .5f), Mathf.FloorToInt(position.z / Size + .5f));
+        public Vector3 Center(Vector2Int cell) => new(cell.x * Size, Height(cell), cell.y * Size);
         public float Height(Vector2Int cell)
         {
-            for (int y = 2; y >= -1; y--)
-                if (blocks.Contains(new Vector3Int(cell.x, y, cell.y))) return (y + 1) * Size;
-            bool insideYard = Mathf.Abs(cell.x) <= groundExtent.x && Mathf.Abs(cell.y) <= groundExtent.y;
-            return insideYard ? -Size : float.NegativeInfinity;
+            int y = Top(cell);
+            return y < Bottom ? float.NegativeInfinity : (y + 1) * Size;
+        }
+
+        private void OnDestroy()
+        {
+            if (atlas) Destroy(atlas);
+            if (material) Destroy(material);
         }
 
         public bool NextStep(Vector2Int from, Vector2Int target, float climb, out Vector2Int result)

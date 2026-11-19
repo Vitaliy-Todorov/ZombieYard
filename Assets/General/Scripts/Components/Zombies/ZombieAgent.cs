@@ -33,12 +33,13 @@ namespace ZombieYard
             if (!player || player.Health.Current == 0 || !gameObject.activeSelf) return;
             Vector3 delta = player.transform.position - transform.position;
             Vector3 flat = Vector3.ProjectOnPlane(delta, Vector3.up);
-            if (flat.sqrMagnitude > .001f) transform.rotation = Quaternion.LookRotation(flat);
+
             var attack = config.weapon.melee;
             if (delta.magnitude <= attack.range &&
                 (!Physics.Linecast(transform.position + Vector3.up * .85f, player.transform.position + Vector3.up,
                     out var hit, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) || hit.collider.GetComponentInParent<YardPlayer>() == player))
             {
+                Face(flat);
                 Strike(attack);
                 return;
             }
@@ -47,7 +48,7 @@ namespace ZombieYard
             if (float.IsNegativeInfinity(grid.Height(cell)) && !stepping)
             {
                 transform.position += Vector3.down * (8 * Time.deltaTime);
-                if (transform.position.y < -5) Health.Damage(Health.Current);
+                if (transform.position.y < grid.VoidHeight) Health.Damage(Health.Current);
                 return;
             }
             if (!stepping && grid.Height(cell) < transform.position.y - .03f)
@@ -61,6 +62,7 @@ namespace ZombieYard
                 if (!grid.NextStep(cell, target, config.maxClimbHeight, out destination)) return;
                 if (cell == target)
                 {
+                    Face(flat);
                     transform.position += Vector3.ClampMagnitude(flat, config.speed * Time.deltaTime);
                     return;
                 }
@@ -76,12 +78,21 @@ namespace ZombieYard
             float t = Mathf.Clamp01(stepTime / Mathf.Max(.01f, duration));
             Vector3 position = Vector3.Lerp(start, end, t);
             if (climb) position.y = Mathf.Lerp(start.y, end.y, Mathf.Clamp01(t * 2.4f));
+            Face(position - transform.position);
             transform.position = position;
             stepping = t < 1;
             float stride = Mathf.Sin(Time.time * 8 + phase);
             leftLeg.localRotation = Quaternion.Euler(stride * 24, 0, 0);
             rightLeg.localRotation = Quaternion.Euler(-stride * 24, 0, 0);
             torso.localRotation = Quaternion.Euler(5, 0, stride * 3);
+        }
+
+        private void Face(Vector3 movement)
+        {
+            movement.y = 0;
+            if (movement.sqrMagnitude < .0000001f) return;
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(movement),
+                config.turnSpeed * Time.deltaTime);
         }
 
         private void Strike(AttackConfig attack)

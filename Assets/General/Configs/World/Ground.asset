@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: Ground
   m_EditorClassIdentifier: ZombieYard.Runtime::ZombieYard.BlockConfig
   prefab: {fileID: 3633555433763615995, guid: c9c9e36d9c0252a438ff82480497e39a, type: 3}
-  hp: 60
+  hp: 117

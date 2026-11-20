@@ -11,10 +11,11 @@ namespace ZombieYard
         private readonly Dictionary<Vector2Int, int> tops = new();
         private readonly Dictionary<Vector2Int, YardChunk> chunks = new();
         internal WalkerRoutes Routes { get; private set; }
-        private int soilHp, woodHp, brickHp, crateHp;
+        private int stoneHp, soilHp, woodHp, brickHp, crateHp;
         private Material material;
         private Texture2D atlas;
         private Vector2Int halfSize;
+        public const int YardLevel = -1; // Feet on the yard surface, in grid cells.
         internal int Bottom { get; private set; }
         public float VoidHeight => (Bottom - 4) * Size;
         public float Size { get; private set; }
@@ -26,6 +27,7 @@ namespace ZombieYard
         {
             Routes = new WalkerRoutes(this);
             soilHp = config.soil.hp;
+            stoneHp = soilHp * Mathf.Max(1, config.subsoilHpMultiplier);
             woodHp = config.fence.hp;
             brickHp = config.masonry.hp;
             crateHp = config.supplyCrate ? config.supplyCrate.hp : 0;
@@ -36,7 +38,9 @@ namespace ZombieYard
             int ridge = Mathf.Max(drop + 10, config.mountainDistance);
             int margin = ridge + 10;
             Extent = halfSize + Vector2Int.one * margin;
-            Bottom = -drop - Mathf.Max(2, config.subsoilDepth) - 1;
+            const int softLayers = 2;
+            int digDepth = softLayers + Mathf.Max(1, config.subsoilDepth);
+            Bottom = YardLevel - drop - digDepth - 1;
 
             var trees = new List<Vector3Int>();
             for (int x = -w - margin; x <= w + margin; x++)
@@ -50,11 +54,22 @@ namespace ZombieYard
                 float slope = Mathf.Clamp01(1 - Mathf.Abs(distance - ridge - ridgeOffset) / 8);
                 float peaks = Mathf.PerlinNoise((x + 35) * .085f, (z + 79) * .085f);
                 int rise = Mathf.RoundToInt(slope * (8 + 15 * peaks));
-                int surface = -1 - depth + rise;
+                int plain = YardLevel - depth - 1;
+                int surface = plain + rise;
+                bool beyondRidge = distance > ridge + ridgeOffset;
+                bool outerWall = outside == margin;
+                if (outerWall) surface += 4;
                 for (int y = Bottom; y <= surface; y++)
-                    Place(y == surface ? Voxel.Turf : Voxel.Earth, x, y, z);
-                if (outside == 0) Place(Voxel.Wood, x, 0, z);
-                if (outside > drop + 4 && x % 5 == 0 && z % 5 == 0)
+                {
+                    Voxel kind;
+                    if (beyondRidge || outerWall || y <= plain - digDepth) kind = Voxel.Bedrock;
+                    else if (y == surface) kind = Voxel.Turf;
+                    else if (y > surface - softLayers) kind = Voxel.Earth;
+                    else kind = Voxel.Stone;
+                    Place(kind, x, y, z);
+                }
+                if (outside == 0) Place(Voxel.Wood, x, YardLevel, z);
+                if (outside < margin - 3 && outside > drop + 4 && x % 5 == 0 && z % 5 == 0)
                 {
                     float cover = Mathf.PerlinNoise((x + 130) * .18f, (z + 270) * .18f);
                     if (cover > .43f) trees.Add(new Vector3Int(x, surface + 1, z));
@@ -66,24 +81,24 @@ namespace ZombieYard
 
             for (int x = -w + 2; x <= -w + 5; x++)
             for (int y = 0; y < 3; y++)
-                Place(Voxel.Brick, x, y, d - 3);
+                Place(Voxel.Brick, x, YardLevel + y, d - 3);
             for (int z = d - 5; z < d - 3; z++)
             for (int y = 0; y < 2; y++)
-                Place(Voxel.Brick, -w + 2, y, z);
-            for (int x = w - 5; x <= w - 3; x++) Place(Voxel.Brick, x, 0, 1);
+                Place(Voxel.Brick, -w + 2, YardLevel + y, z);
+            for (int x = w - 5; x <= w - 3; x++) Place(Voxel.Brick, x, YardLevel, 1);
             if (config.supplyCrate)
             {
                 var cell = Cell(supplyPosition);
-                Place(Voxel.Crate, cell.x, 0, cell.y);
+                Place(Voxel.Crate, cell.x, YardLevel, cell.y);
             }
 
             // The old water tower is a landmark on the far side of the northern slope.
-            int towerZ = d + drop + 5;
+            int towerZ = d + drop + 6;
             for (int x = 5; x <= 7; x++)
             for (int z = towerZ - 1; z <= towerZ + 1; z++)
             {
                 if (x != 6 && z != towerZ)
-                    for (int y = -drop - 1; y < 1; y++) Place(Voxel.Wood, x, y, z);
+                    for (int y = YardLevel - drop - 1; y < 1; y++) Place(Voxel.Wood, x, y, z);
                 for (int y = 1; y <= 2; y++) Place(Voxel.Metal, x, y, z);
             }
 
@@ -128,13 +143,14 @@ namespace ZombieYard
         public Health HealthAt(Vector3Int cell)
         {
             var kind = BlockAt(cell);
-            if (kind == Voxel.Air) return null;
+            if (kind == Voxel.Air || kind == Voxel.Bedrock) return null;
             if (damaged.TryGetValue(cell, out var existing)) return existing;
             int hp = kind switch
             {
                 Voxel.Wood or Voxel.Bark => woodHp,
                 Voxel.Brick or Voxel.Metal => brickHp,
                 Voxel.Crate => crateHp,
+                Voxel.Stone => stoneHp,
                 _ => soilHp
             };
             var obj = new GameObject($"Damaged block {cell}");

@@ -16,6 +16,9 @@ namespace ZombieYard.Tests
         private readonly HashSet<Vector3Int> excavated = new();
         private float oldTimeScale;
         private float Size => scene.grid.Size;
+        // Cave layouts use coordinates relative to the yard surface.
+        private float WorldY(int level) => (YardGrid.YardLevel + level) * Size;
+        private Vector3 WorldPosition(Vector3Int cell) => (Vector3)(cell + YardGrid.YardLevel * Vector3Int.up) * Size;
         private int PlayerHp => scene.player.Health.Current;
         private Vector2Int WalkerColumn => scene.grid.Cell(walker.transform.position);
 
@@ -38,7 +41,7 @@ namespace ZombieYard.Tests
         private void Dig(Vector3Int from, Vector3Int direction)
         {
             if (!excavated.Add(from + direction)) return;
-            Vector3 origin = ((Vector3)from + .5f * Vector3.up) * Size;
+            Vector3 origin = WorldPosition(from) + .5f * Size * Vector3.up;
             Assert.IsTrue(Physics.Raycast(origin, direction, out var hit, Size), $"No face at {from + direction}");
             var block = Health.AtHit(hit);
             Assert.IsNotNull(block);
@@ -66,13 +69,13 @@ namespace ZombieYard.Tests
         {
             var body = scene.player.GetComponent<CharacterController>();
             body.enabled = false;
-            scene.player.transform.position = (Vector3)feet * Size + .03f * Vector3.up;
+            scene.player.transform.position = WorldPosition(feet) + .03f * Vector3.up;
             body.enabled = true;
         }
 
         private void SpawnWalker(Vector3Int feet, ZombieConfig settings = null)
         {
-            walker = Object.Instantiate(scene.spawn.prefab, (Vector3)feet * Size, Quaternion.identity);
+            walker = Object.Instantiate(scene.spawn.prefab, WorldPosition(feet), Quaternion.identity);
             walker.Initialize(settings ? settings : scene.spawn.zombie, scene.grid, scene.player, _ => { });
         }
 
@@ -101,16 +104,16 @@ namespace ZombieYard.Tests
             MovePlayer(bend + 3 * Vector3Int.forward);
             SpawnWalker(new Vector3Int(shaft.x, 0, shaft.z));
             yield return new WaitForSeconds(1.6f);
-            Assert.AreEqual(shaft.y * Size, walker.transform.position.y, .04f, "Walker must land on the shaft floor.");
+            Assert.AreEqual(WorldY(shaft.y), walker.transform.position.y, .04f, "Walker must land on the shaft floor.");
             Assert.AreEqual(new Vector2Int(shaft.x, shaft.z), WalkerColumn, "Low doorway must block the walker.");
             Assert.AreEqual(scene.player.Health.Maximum, PlayerHp);
 
             Dig(shaft + Vector3Int.right, Vector3Int.up);
-            Assert.AreEqual(0, scene.grid.Height(new Vector2Int(shaft.x + 1, shaft.z)), "Roof stays intact.");
+            Assert.AreEqual(WorldY(0), scene.grid.Height(new Vector2Int(shaft.x + 1, shaft.z)), "Roof stays intact.");
             bool roundedBend = false;
             yield return UntilHit(() =>
             {
-                Assert.AreEqual(shaft.y * Size, walker.transform.position.y, .04f, "Walker left the cave floor.");
+                Assert.AreEqual(WorldY(shaft.y), walker.transform.position.y, .04f, "Walker left the cave floor.");
                 Assert.IsTrue(WalkerColumn.y == shaft.z || WalkerColumn.x == bend.x, "Walker crossed the solid corner.");
                 roundedBend |= WalkerColumn.x == bend.x && WalkerColumn.y > shaft.z;
             });
@@ -165,7 +168,7 @@ namespace ZombieYard.Tests
             Tunnel(stair + Vector3Int.left * 3, Vector3Int.back, 3);
             MovePlayer(lower);
             SpawnWalker(shaft);
-            yield return UntilHit(() => Assert.AreEqual(lower.y * Size, walker.transform.position.y, .04f));
+            yield return UntilHit(() => Assert.AreEqual(WorldY(lower.y), walker.transform.position.y, .04f));
 
             MovePlayer(upper);
             Vector3 stopped = walker.transform.position;
@@ -176,12 +179,12 @@ namespace ZombieYard.Tests
             bool usedStairs = false;
             yield return UntilHit(() => usedStairs |= WalkerColumn == new Vector2Int(3, 3));
             Assert.IsTrue(usedStairs, "Walker must take the stairs to the upper gallery.");
-            Assert.AreEqual(upper.y * Size, walker.transform.position.y, .04f);
+            Assert.AreEqual(WorldY(upper.y), walker.transform.position.y, .04f);
             MovePlayer(lower);
             usedStairs = false;
             yield return UntilHit(() => usedStairs |= WalkerColumn == new Vector2Int(3, 3));
             Assert.IsTrue(usedStairs, "A vertical-only target change must send the walker back downstairs.");
-            Assert.AreEqual(lower.y * Size, walker.transform.position.y, .04f);
+            Assert.AreEqual(WorldY(lower.y), walker.transform.position.y, .04f);
         }
 
         [UnityTest]
@@ -194,7 +197,7 @@ namespace ZombieYard.Tests
             Tunnel(shaft, Vector3Int.right, 3);
 
             // Seed the first air voxel directly to keep all six sides of this chamber sealed.
-            var seed = scene.grid.HealthAt(room);
+            var seed = scene.grid.HealthAt(room + YardGrid.YardLevel * Vector3Int.up);
             seed.Damage(seed.Current);
             Dig(room, Vector3Int.up);
             Tunnel(room, Vector3Int.right, 2);
@@ -252,7 +255,7 @@ namespace ZombieYard.Tests
                 settings.maxClimbHeight = Size - .01f;
                 SpawnWalker(shaft, settings);
                 yield return new WaitForSeconds(3);
-                Assert.AreEqual((Vector3)shaft * Size, walker.transform.position);
+                Assert.AreEqual(WorldPosition(shaft), walker.transform.position);
                 Assert.AreEqual(scene.player.Health.Maximum, PlayerHp);
                 Object.Destroy(walker.gameObject);
                 yield return null;
@@ -262,8 +265,8 @@ namespace ZombieYard.Tests
                 bool passedFirstStep = false, surfaced = false;
                 yield return UntilHit(() =>
                 {
-                    passedFirstStep |= WalkerColumn.x == 2 && Mathf.Abs(walker.transform.position.y + 2 * Size) < .04f;
-                    surfaced |= walker.transform.position.y >= -.04f;
+                    passedFirstStep |= WalkerColumn.x == 2 && Mathf.Abs(walker.transform.position.y - WorldY(-2)) < .04f;
+                    surfaced |= walker.transform.position.y >= WorldY(0) - .04f;
                 });
                 Assert.IsTrue(passedFirstStep, "Climb exactly equal to the configured limit is allowed.");
                 Assert.IsTrue(surfaced, "Walker must emerge and reach the player above the tunnel.");
@@ -291,9 +294,9 @@ namespace ZombieYard.Tests
             bool dropped = false;
             yield return UntilHit(() =>
             {
-                if (walker.transform.position.y < high.y * Size - .04f)
+                if (walker.transform.position.y < WorldY(high.y) - .04f)
                     Assert.GreaterOrEqual(WalkerColumn.x, landing.x, "Walker descended inside the ledge.");
-                dropped |= WalkerColumn.x == landing.x && walker.transform.position.y < (high.y - 1) * Size;
+                dropped |= WalkerColumn.x == landing.x && walker.transform.position.y < WorldY(high.y - 1);
             });
             Assert.IsTrue(dropped);
 
@@ -306,9 +309,9 @@ namespace ZombieYard.Tests
             Dig(lip, Vector3Int.down);
             bool usedStep = false;
             yield return UntilHit(() => usedStep |= WalkerColumn.x == lip.x &&
-                Mathf.Abs(walker.transform.position.y - (lip.y - 1) * Size) < .04f);
+                Mathf.Abs(walker.transform.position.y - WorldY(lip.y - 1)) < .04f);
             Assert.IsTrue(usedStep);
-            Assert.AreEqual(high.y * Size, walker.transform.position.y, .04f);
+            Assert.AreEqual(WorldY(high.y), walker.transform.position.y, .04f);
         }
     }
 }

@@ -6,13 +6,16 @@ namespace ZombieYard
     {
         private HeldWeapon weapon;
         private AmmoConfig ammo;
-        private int count;
+        private int count, healing;
+        private float voidHeight;
+        public bool Automatic => IsAmmo || healing > 0;
         public bool IsAmmo => ammo != null;
-        public string Title => weapon != null ? weapon.Config.title : ammo.title + " ×" + count;
+        public string Title => healing > 0 ? (healing == int.MaxValue ? "Полная аптечка" : "Малая аптечка") :
+            weapon != null ? weapon.Config.title : ammo.title + " ×" + count;
 
         private void FixedUpdate()
         {
-            if (transform.position.y < -12) Destroy(gameObject);
+            if (transform.position.y < voidHeight) Destroy(gameObject);
         }
         public static Pickup ForWeapon(HeldWeapon weapon, Vector3 position)
         {
@@ -54,6 +57,14 @@ namespace ZombieYard
             return pickup;
         }
 
+        public static Pickup ForMedkit(PlayerConfig config, bool full, Vector3 position)
+        {
+            var pickup = Create(full ? config.fullMedkitVisual : config.partialMedkitVisual, position, false);
+            pickup.healing = full ? int.MaxValue : Mathf.Max(1, config.partialHealing);
+            pickup.name = pickup.Title;
+            return pickup;
+        }
+
         private static Pickup Create(GameObject visual, Vector3 position, bool isWeapon)
         {
             var root = new GameObject(isWeapon ? "Weapon pickup" : "Ammo pickup");
@@ -66,14 +77,18 @@ namespace ZombieYard
             box.center = bounds.center - position;
             box.size = Vector3.Max(bounds.size, Vector3.one * .12f);
             root.AddComponent<Rigidbody>().collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-            return root.AddComponent<Pickup>();
+            var pickup = root.AddComponent<Pickup>();
+            var grid = FindAnyObjectByType<YardGrid>();
+            pickup.voidHeight = grid ? grid.VoidHeight : -12;
+            return pickup;
         }
 
-        public bool Collect(Inventory inventory)
+        public bool Collect(Inventory inventory, Health recipient = null)
         {
             if (!gameObject.activeSelf) return false;
             if (weapon != null && !inventory.Take(weapon)) return false;
-            if (weapon == null) inventory.Add(ammo, count);
+            if (healing > 0 && (!recipient || !recipient.Heal(healing))) return false;
+            if (IsAmmo) inventory.Add(ammo, count);
             gameObject.SetActive(false);
             Destroy(gameObject);
             return true;

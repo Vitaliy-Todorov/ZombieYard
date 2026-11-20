@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 538d6475ead91fc4f9d53906f5c387f7, type: 3}
   m_Name: ShovelStrike
   m_EditorClassIdentifier: ZombieYard.Runtime::ZombieYard.AttackConfig
-  damage: 30
+  damage: 117
   range: 2.6

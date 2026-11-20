@@ -17,6 +17,9 @@ MonoBehaviour:
   sprint: 6.8
   jumpHeight: 1.55
   pickupReach: 2.8
+  partialHealing: 35
+  partialMedkitVisual: {fileID: 5668346956849457054, guid: 725be62f8a9d85a45aff3bc641037938, type: 3}
+  fullMedkitVisual: {fileID: 2366706023208460633, guid: dbd19ab42fcb7364bb877448a78c76b8, type: 3}
   startingWeapons:
   - {fileID: 11400000, guid: d1d2a30a75e9d1f41979806e497bc32b, type: 2}
   - {fileID: 11400000, guid: 61b786062549f3c42b77eaef15626cd2, type: 2}

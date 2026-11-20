@@ -11,6 +11,8 @@ namespace ZombieYard
         [Range(0, 30)] public float spreadDegrees = 4;
         [Min(1)] public float range = 45;
         [Min(1)] public float speed = 36;
+        [Tooltip("Positive lifetime enables ricochets and replaces the range limit during flight.")]
+        [Min(0)] public float ricochetSeconds;
         public ShotProjectile projectilePrefab;
         public GameObject pickupVisual;
     }

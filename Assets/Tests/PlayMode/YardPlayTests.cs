@@ -19,7 +19,8 @@ namespace ZombieYard.Tests
             var config = scene.world;
             int originalHp = config.soil.hp;
             int originalHeight = config.plateauHeight;
-            Vector3 origin = Vector3.up * 2;
+            float yardHeight = YardGrid.YardLevel * scene.grid.Size;
+            Vector3 origin = Vector3.up * (yardHeight + 2);
             try
             {
                 config.soil.hp = originalHp + 17;
@@ -28,16 +29,16 @@ namespace ZombieYard.Tests
                 var block = Health.AtHit(hit);
                 Assert.AreEqual(originalHp, block.Current);
                 block.Damage(block.Current);
-                Assert.Less(scene.grid.Height(Vector2Int.zero), 0);
+                Assert.Less(scene.grid.Height(Vector2Int.zero), yardHeight);
 
                 yield return SceneManager.LoadSceneAsync("Yard");
                 yield return null;
                 scene = Object.FindAnyObjectByType<GameLifetimeScope>();
-                Assert.AreEqual(0, scene.grid.Height(Vector2Int.zero));
+                Assert.AreEqual(yardHeight, scene.grid.Height(Vector2Int.zero));
                 Assert.IsTrue(Physics.Raycast(origin, Vector3.down, out hit, 4));
                 Assert.AreEqual(originalHp + 17, Health.AtHit(hit).Current);
                 var lowland = new Vector2Int(config.halfSize.x + config.plateauHeight + 1, 0);
-                Assert.AreEqual(-config.plateauHeight * scene.grid.Size, scene.grid.Height(lowland));
+                Assert.AreEqual((YardGrid.YardLevel - config.plateauHeight) * scene.grid.Size, scene.grid.Height(lowland));
             }
             finally
             {
@@ -58,13 +59,36 @@ namespace ZombieYard.Tests
             Vector3 neighbor = top + Vector3.right * grid.Size;
             Assert.IsTrue(Physics.Raycast(neighbor + Vector3.up, Vector3.down, out var other, 2));
             var adjacent = Health.AtHit(other);
-            for (int layer = 0; layer < 3; layer++)
+            var strike = scene.player.Gear.Active.Config.melee;
+            Assert.AreEqual(scene.spawn.zombie.hp * 1.8f, scene.world.soil.hp, .001f);
+            Assert.AreEqual(13, scene.world.subsoilDepth);
+            for (int layer = 0; layer < 2 + scene.world.subsoilDepth; layer++)
             {
                 Assert.IsTrue(Physics.Raycast(top + Vector3.up, Vector3.down, out var hit));
                 var block = Health.AtHit(hit);
-                Assert.AreEqual(scene.world.soil.hp, block.Current);
-                block.Damage(block.Current);
-                Assert.AreEqual(-(layer + 1) * grid.Size, grid.Height(cell));
+                int hits = layer < 2 ? 1 : 4;
+                for (int i = 1; i <= hits; i++)
+                {
+                    Assert.Greater(block.Current, 0);
+                    block.Damage(strike.damage);
+                    if (i < hits) Assert.AreEqual(top.y - layer * grid.Size, grid.Height(cell));
+                }
+                Assert.AreEqual(top.y - (layer + 1) * grid.Size, grid.Height(cell));
+            }
+            Assert.IsTrue(Physics.Raycast(top + Vector3.up, Vector3.down, out var floor));
+            Assert.IsNull(Health.AtHit(floor));
+            Assert.AreEqual(top.y - 15 * grid.Size, floor.point.y, .01f);
+            foreach (var dir in new[] { Vector2Int.left, Vector2Int.right, Vector2Int.up, Vector2Int.down })
+            {
+                int half = dir.x == 0 ? scene.world.halfSize.y : scene.world.halfSize.x;
+                var outer = dir * (half + scene.world.mountainDistance + 10);
+                var origin = grid.Center(outer) + Vector3.up;
+                Assert.IsTrue(Physics.Raycast(origin, Vector3.down, out var rim, 2));
+                Assert.IsNull(Health.AtHit(rim));
+                var through = new Vector3(outer.x, YardGrid.YardLevel - 12, outer.y) * grid.Size;
+                Vector3 outward = new Vector3(dir.x, 0, dir.y);
+                Assert.IsTrue(Physics.Raycast(through + 2 * grid.Size * outward, -outward, out rim, 3 * grid.Size));
+                Assert.IsNull(Health.AtHit(rim));
             }
             Assert.IsTrue(Physics.Raycast(top - Vector3.up * grid.Size * .5f, Vector3.right, out var wall, grid.Size));
             Assert.AreSame(adjacent, Health.AtHit(wall));
@@ -82,7 +106,7 @@ namespace ZombieYard.Tests
             var start = player.transform.position;
             var lowland = new Vector2Int(scene.world.halfSize.x + scene.world.plateauHeight + 1, 0);
             Vector3 outside = scene.grid.Center(lowland);
-            Assert.AreEqual(-scene.world.plateauHeight * scene.grid.Size, outside.y);
+            Assert.AreEqual((YardGrid.YardLevel - scene.world.plateauHeight) * scene.grid.Size, outside.y);
             body.enabled = false;
             player.transform.position = outside + Vector3.up * .03f;
             body.enabled = true;
@@ -106,13 +130,13 @@ namespace ZombieYard.Tests
             var grid = scene.grid;
             float size = grid.Size;
             int edge = scene.world.halfSize.x;
-            var shaft = new Vector2Int(edge + 2, 4);
-            var bank = new Vector2Int(edge + 4, shaft.y);
+            var shaft = new Vector2Int(edge + 1, 4);
+            var bank = new Vector2Int(edge + 3, shaft.y);
             foreach (Vector2Int direction in new[] { Vector2Int.left, Vector2Int.right, Vector2Int.up, Vector2Int.down })
             {
                 int boundary = direction.x == 0 ? scene.world.halfSize.y : edge;
-                for (int ring = 1; ring <= 6; ring++)
-                    Assert.AreEqual(-(ring - 1) * size, grid.Height(direction * (boundary + ring)));
+                for (int ring = 1; ring <= scene.world.plateauHeight + 1; ring++)
+                    Assert.AreEqual((YardGrid.YardLevel - ring + 1) * size, grid.Height(direction * (boundary + ring)));
             }
             Vector3 reservoir = grid.Center(bank);
             reservoir.y = -2 * size;
@@ -261,7 +285,9 @@ namespace ZombieYard.Tests
             var gear = player.Gear;
             Assert.AreEqual(player.config.hp, player.Health.Current);
             Assert.AreSame(player.config.startingWeapons[0], gear.Active.Config);
-            var pickup = Object.FindAnyObjectByType<Pickup>();
+            var pickup = System.Array.Find(Object.FindObjectsByType<Pickup>(FindObjectsSortMode.None),
+                item => item.Title == scene.rifle.title);
+            Assert.IsNotNull(pickup);
             Assert.IsFalse(pickup.Collect(gear));
             gear.Select(1);
             var dummy = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -292,15 +318,12 @@ namespace ZombieYard.Tests
             player.transform.position = scene.grid.Center(cell) + Vector3.up * .04f;
             controller.enabled = true;
             player.eyes.transform.rotation = Quaternion.LookRotation(Vector3.down);
+            float yardHeight = scene.grid.Height(cell);
             player.Attack();
-            Assert.IsTrue(Physics.Raycast(player.eyes.transform.position, Vector3.down, out var ground, 3));
-            var block = Health.AtHit(ground);
-            Assert.AreEqual(block.Maximum - 30, block.Current);
-            block.Damage(block.Current);
-            Assert.AreEqual(-scene.grid.Size, scene.grid.Height(cell));
+            Assert.AreEqual(yardHeight - scene.grid.Size, scene.grid.Height(cell));
             yield return new WaitForSeconds(.65f);
             Assert.IsTrue(controller.isGrounded);
-            Assert.AreEqual(-scene.grid.Size, player.transform.position.y, .1f);
+            Assert.AreEqual(yardHeight - scene.grid.Size, player.transform.position.y, .1f);
             Assert.AreEqual(player.config.hp, player.Health.Current);
 
             var pad = InputSystem.AddDevice<Gamepad>();
@@ -314,7 +337,7 @@ namespace ZombieYard.Tests
                     yield return null;
                     peak = Mathf.Max(peak, player.transform.position.y);
                 }
-                Assert.Greater(player.transform.position.y, -.15f, $"Jump from {cell}, peak {peak}, final {player.transform.position}");
+                Assert.Greater(player.transform.position.y, yardHeight - .15f, $"Jump from {cell}, peak {peak}, final {player.transform.position}");
             }
             finally { InputSystem.RemoveDevice(pad); }
         }
@@ -396,7 +419,7 @@ namespace ZombieYard.Tests
                 {
                     var alive = Object.FindObjectsByType<ZombieAgent>(FindObjectsSortMode.None);
                     Assert.LessOrEqual(alive.Length, 1);
-                    if (alive.Length == 1 && alive[0].transform.position.y > size * .9f) climbed = true;
+                    if (alive.Length == 1 && alive[0].transform.position.y > (YardGrid.YardLevel + .9f) * size) climbed = true;
                     yield return null;
                 }
                 Assert.IsTrue(climbed);

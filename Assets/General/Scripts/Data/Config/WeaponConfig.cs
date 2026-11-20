@@ -9,10 +9,11 @@ namespace ZombieYard
         [Min(.05f)] public float delay = .65f;
         public AttackConfig melee;
         public bool diggingMotion;
+        public AmmoConfig staffBolt;
         public AmmoConfig[] compatibleAmmo;
         [Min(0)] public int capacity;
         [Min(.05f)] public float reloadSeconds = 1.3f;
         public GameObject visual;
-        public bool UsesAmmo => melee == null;
+        public bool UsesAmmo => melee == null && staffBolt == null;
     }
 }

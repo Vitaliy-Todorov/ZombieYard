@@ -5,8 +5,8 @@ namespace ZombieYard
 {
     internal static class YardAtlas
     {
-        private const int Pixels = 16, Tiles = 12;
-        private enum Tile { Turf, Earth, Wood, Brick, Crate, Bark, Leaves, Metal, TurfSide, EndGrain, Stone, Bedrock }
+        private const int Pixels = 16, Tiles = 13;
+        private enum Tile { Turf, Earth, Wood, Brick, Crate, Bark, Leaves, Metal, TurfSide, EndGrain, Stone, Bedrock, Rose }
 
         // Block prefabs supply the art palette; a chunk shares a single material and texture.
         private static Color32 Sample(BlockConfig block, string part, Color32 fallback)
@@ -26,7 +26,7 @@ namespace ZombieYard
                 Sample(config.masonry, "Brick", new Color32(155, 81, 63, 255)),
                 Sample(config.supplyCrate, "Case", new Color32(181, 132, 78, 255)),
                 new(100, 71, 49, 255), new(68, 95, 65, 255), new(108, 133, 133, 255), earth, new(165, 125, 81, 255),
-                new(103, 98, 89, 255), new(59, 63, 68, 255)
+                new(103, 98, 89, 255), new(59, 63, 68, 255), new(169, 100, 114, 255)
             };
             var atlas = new Texture2D(Tiles * Pixels, Pixels, TextureFormat.RGBA32, false)
                 { name = "Yard block tiles", filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
@@ -60,6 +60,8 @@ namespace ZombieYard
             {
                 Voxel.Stone => (int)Tile.Stone,
                 Voxel.Bedrock => (int)Tile.Bedrock,
+                Voxel.Pillar => (int)Tile.Brick,
+                Voxel.RoseStone or Voxel.RoseBedrock => (int)Tile.Rose,
                 _ => (int)kind - 1
             };
             if (kind == Voxel.Turf && normalY <= 0) tile = normalY == 0 ? (int)Tile.TurfSide : (int)Tile.Earth;

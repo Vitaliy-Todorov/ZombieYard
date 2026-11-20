@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: Walker
   m_EditorClassIdentifier: ZombieYard.Runtime::ZombieYard.ZombieConfig
   hp: 65
+  redStrength: 2
+  purpleStrength: 3
+  redTint: {r: 0.85, g: 0.12, b: 0.08, a: 1}
+  purpleTint: {r: 0.57, g: 0.13, b: 0.9, a: 1}
   speed: 1.65
   maxClimbHeight: 1.55
   climbDuration: 0.85
@@ -24,3 +28,9 @@ MonoBehaviour:
   - ammo: {fileID: 11400000, guid: 8d89e37f0a6269e48b5f5e7a38c9f386, type: 2}
     chance: 0.25
     quantity: {x: 2, y: 3}
+  - minimumKind: 1
+    weapon: {fileID: 11400000, guid: 84a202f9ff46b604bbaa9141cd42e847, type: 2}
+    chance: 0.15
+  - minimumKind: 2
+    partialMedkit: 1
+    chance: 1

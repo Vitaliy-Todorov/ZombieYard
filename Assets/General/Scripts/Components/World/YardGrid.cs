@@ -9,19 +9,23 @@ namespace ZombieYard
         private readonly Dictionary<Vector3Int, Voxel> blocks = new();
         private readonly Dictionary<Vector3Int, Health> damaged = new();
         private readonly Dictionary<Vector2Int, int> tops = new();
+        // Vertical span of fixed shop furniture in each occupied navigation column.
+        private readonly Dictionary<Vector2Int, Vector2Int> furnitureLevels = new();
         private readonly Dictionary<Vector2Int, YardChunk> chunks = new();
         internal WalkerRoutes Routes { get; private set; }
-        private int stoneHp, soilHp, woodHp, brickHp, crateHp;
+        private int stoneHp, soilHp, woodHp, brickHp, pillarHp, crateHp;
         private Material material;
         private Texture2D atlas;
         private Vector2Int halfSize;
         public const int YardLevel = -1; // Feet on the yard surface, in grid cells.
         public int ShopFloorLevel { get; private set; }
+        public ArenaLayout Arena { get; private set; }
         internal int Bottom { get; private set; }
         public float VoidHeight => (Bottom - 4) * Size;
         public float Size { get; private set; }
         internal Vector2Int Extent { get; private set; }
         internal event System.Action<Vector3Int> BlockRemoved;
+        internal event System.Action<Vector3Int> StoneMined;
         public Vector2 SafeExtent => new Vector2(halfSize.x + .5f, halfSize.y + .5f) * Size;
 
         public void Build(WorldConfig config, Vector3 supplyPosition)
@@ -31,13 +35,16 @@ namespace ZombieYard
             stoneHp = soilHp * Mathf.Max(1, config.subsoilHpMultiplier);
             woodHp = config.fence.hp;
             brickHp = config.masonry.hp;
+            pillarHp = config.arenaPillar.hp;
             crateHp = config.supplyCrate ? config.supplyCrate.hp : 0;
             Size = config.blockSize;
             int w = Mathf.Max(4, config.halfSize.x), d = Mathf.Max(4, config.halfSize.y);
             halfSize = new Vector2Int(w, d);
             int drop = Mathf.Max(1, config.plateauHeight);
-            int ridge = Mathf.Max(drop + 10, config.mountainDistance);
+            // Keep the mountain clear of the plateau even on small maps.
+            int ridge = Mathf.Max(drop + 20, config.mountainDistance);
             int margin = ridge + 10;
+            Arena = new ArenaLayout(w, ridge, Size);
             Extent = halfSize + Vector2Int.one * margin;
             const int softLayers = 2;
             int digDepth = softLayers + Mathf.Max(1, config.subsoilDepth);
@@ -62,20 +69,28 @@ namespace ZombieYard
                 bool beyondRidge = distance > ridge + ridgeOffset;
                 bool outerWall = outside == margin;
                 if (outerWall) surface += 4;
-                bool shopColumn = Mathf.Abs(x) <= 3 && z >= -3 && z <= 1;
+                bool mountain = Arena.ShapeColumn(x, z, ref surface, out int arenaFloor,
+                    out int arenaCeiling, out bool pillar, out bool rose);
+                bool shopColumn = Mathf.Abs(x) <= 3 && Mathf.Abs(z) <= 2;
                 int bedrock = shopColumn ? ShopFloorLevel - 1 : plain - digDepth;
                 for (int y = Bottom; y <= surface; y++)
                 {
                     if (shopColumn && y >= ShopFloorLevel && y < ShopFloorLevel + 4) continue;
                     Voxel kind;
-                    if (beyondRidge || outerWall || y <= bedrock) kind = Voxel.Bedrock;
+                    if (y >= arenaFloor && y < arenaCeiling)
+                    {
+                        if (!pillar) continue;
+                        kind = Voxel.Pillar;
+                    }
+                    else if (rose && y >= surface - 1) kind = beyondRidge ? Voxel.RoseBedrock : Voxel.RoseStone;
+                    else if (beyondRidge || outerWall || y <= bedrock) kind = Voxel.Bedrock;
                     else if (y == surface) kind = Voxel.Turf;
-                    else if (y > surface - softLayers) kind = Voxel.Earth;
+                    else if (y > surface - softLayers - (outside <= 0 ? drop : 0)) kind = Voxel.Earth;
                     else kind = Voxel.Stone;
                     Place(kind, x, y, z);
                 }
                 if (outside == 0) Place(Voxel.Wood, x, YardLevel, z);
-                if (outside < margin - 3 && outside > drop + 4 && x % 5 == 0 && z % 5 == 0)
+                if (!mountain && outside < margin - 3 && outside > drop + 4 && x % 5 == 0 && z % 5 == 0)
                 {
                     float cover = Mathf.PerlinNoise((x + 130) * .18f, (z + 270) * .18f);
                     if (cover > .43f) trees.Add(new Vector3Int(x, surface + 1, z));
@@ -139,6 +154,27 @@ namespace ZombieYard
         internal Voxel BlockAt(Vector3Int cell) => blocks.GetValueOrDefault(cell);
         internal int Top(Vector2Int column) => tops.TryGetValue(column, out int y) ? y : Bottom - 1;
 
+        internal void RegisterCounter(Bounds bounds)
+        {
+            // A face exactly on a cell edge does not occupy the neighbouring cell.
+            var min = bounds.min + Vector3.one * .001f;
+            var max = bounds.max - Vector3.one * .001f;
+            var first = Cell(min);
+            var last = Cell(max);
+            var levels = new Vector2Int(Mathf.FloorToInt(min.y / Size), Mathf.FloorToInt(max.y / Size));
+            for (int x = first.x; x <= last.x; x++)
+            for (int z = first.y; z <= last.y; z++)
+                furnitureLevels[new Vector2Int(x, z)] = levels;
+            Routes.Invalidate();
+        }
+
+        internal int WalkerTop(Vector2Int column) => furnitureLevels.TryGetValue(column, out var levels)
+            ? Mathf.Max(Top(column), levels.y) : Top(column);
+
+        internal bool WalkerSolid(Vector3Int cell) => BlockAt(cell) != Voxel.Air ||
+            (furnitureLevels.TryGetValue(new Vector2Int(cell.x, cell.z), out var levels) &&
+             cell.y >= levels.x && cell.y <= levels.y);
+
         private void Place(Voxel kind, int x, int y, int z)
         {
             if (!blocks.TryAdd(new Vector3Int(x, y, z), kind)) return;
@@ -149,14 +185,15 @@ namespace ZombieYard
         public Health HealthAt(Vector3Int cell)
         {
             var kind = BlockAt(cell);
-            if (kind == Voxel.Air || kind == Voxel.Bedrock) return null;
+            if (kind is Voxel.Air or Voxel.Bedrock or Voxel.RoseBedrock) return null;
             if (damaged.TryGetValue(cell, out var existing)) return existing;
             int hp = kind switch
             {
                 Voxel.Wood or Voxel.Bark => woodHp,
                 Voxel.Brick or Voxel.Metal => brickHp,
+                Voxel.Pillar => pillarHp,
                 Voxel.Crate => crateHp,
-                Voxel.Stone => stoneHp,
+                Voxel.Stone or Voxel.RoseStone => stoneHp,
                 _ => soilHp
             };
             var obj = new GameObject($"Damaged block {cell}");
@@ -168,6 +205,7 @@ namespace ZombieYard
             {
                 damaged.Remove(cell);
                 Remove(cell);
+                if (kind == Voxel.Stone && health.KilledByPlayer) StoneMined?.Invoke(cell);
                 Destroy(obj);
             };
             return health;
@@ -177,7 +215,6 @@ namespace ZombieYard
         {
             blocks.Remove(cell);
             Routes.Invalidate();
-            BlockRemoved?.Invoke(cell);
             var column = new Vector2Int(cell.x, cell.z);
             if (Top(column) == cell.y)
             {
@@ -193,6 +230,7 @@ namespace ZombieYard
                 var key = new Vector2Int(ChunkIndex(other.x), ChunkIndex(other.y));
                 if (key != owner && chunks.TryGetValue(key, out var adjacent)) adjacent.Rebuild();
             }
+            BlockRemoved?.Invoke(cell);
         }
 
         public bool IsOutside(Vector3 position)
@@ -219,12 +257,12 @@ namespace ZombieYard
         internal bool TryGround(Vector3 feet, out Vector3Int stand)
         {
             var column = Cell(feet);
-            int top = Top(column);
+            int top = WalkerTop(column);
             int y = Mathf.Min(top, Mathf.FloorToInt((feet.y + .04f) / Size) - 1);
             stand = new Vector3Int(column.x, y + 1, column.y);
             while (y >= Bottom)
             {
-                if (y == top || BlockAt(new Vector3Int(column.x, y, column.y)) != Voxel.Air)
+                if (y == top || WalkerSolid(new Vector3Int(column.x, y, column.y)))
                 {
                     stand.y = y + 1;
                     return true;

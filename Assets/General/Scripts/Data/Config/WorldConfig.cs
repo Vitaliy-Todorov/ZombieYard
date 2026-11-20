@@ -3,6 +3,16 @@ using UnityEngine;
 namespace ZombieYard
 {
     [System.Serializable]
+    public struct EyeSettings
+    {
+        public ArenaEye prefab;
+        [Min(1)] public int hp;
+        public AttackConfig laser;
+        [Min(1)] public float trackingDegrees, firingDegrees;
+        [Min(.05f)] public float aimSeconds, chargeSeconds, fireSeconds, cooldownSeconds, tickSeconds;
+    }
+
+    [System.Serializable]
     public struct ShopTerms
     {
         [Min(0)] public int price, stock;
@@ -26,6 +36,9 @@ namespace ZombieYard
         public GameObject shopCounter;
         public AmmoDeal shells, rifleRounds;
         public ShopTerms partialMedkit, fullMedkit, staff;
+        [Header("Eye in the red mountain")]
+        public EyeSettings eye;
+        public BlockConfig arenaPillar;
         [Header("Terrain and fog")]
         [Min(1)] public int plateauHeight = 4;
         [Min(10)] public int mountainDistance = 44;
@@ -39,7 +52,7 @@ namespace ZombieYard
         public Shader exteriorFogShader;
         public Color fogColor = new(.55f, .66f, .56f);
         [Min(.01f)] public float fogDensity = .13f;
-        [Min(1)] public int fogDamage = 8;
+        [Min(1)] public float fogDamage = 14.4f;
         [Min(.05f)] public float fogInterval = 1;
     }
 }

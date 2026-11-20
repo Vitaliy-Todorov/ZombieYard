@@ -1149,6 +1149,11 @@ MonoBehaviour:
   leftLeg: {fileID: 6831998390103123566}
   rightLeg: {fileID: 309063992247820616}
   torso: {fileID: 8085342009213009556}
+  variantParts:
+  - {fileID: 365952061437737729}
+  - {fileID: 5690934162245541596}
+  - {fileID: 7401144563303163158}
+  - {fileID: 5251109679666147136}
 --- !u!114 &5033525920815557854
 MonoBehaviour:
   m_ObjectHideFlags: 0

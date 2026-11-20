@@ -23,6 +23,13 @@ namespace ZombieYard
         public string Notice { get; private set; }
         public ExteriorFog Fog { get; internal set; }
         public bool Paused { get; private set; }
+        public bool Victory { get; private set; }
+        public int Cycle { get; private set; }
+        private static int nextCycle;
+        private bool reloadingScene;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetCycle() => nextCycle = 0;
 
         private CharacterController body;
         private InputActionMap input;
@@ -39,6 +46,8 @@ namespace ZombieYard
         public void Initialize(float voidHeight)
         {
             this.voidHeight = voidHeight;
+            Cycle = nextCycle;
+            nextCycle = 0;
             Gear = new Inventory(config);
             Health = GetComponent<Health>();
             Health.Initialize(config.hp);
@@ -75,6 +84,7 @@ namespace ZombieYard
 
         public void TogglePause()
         {
+            if (Victory) return;
             Paused = !Paused;
             Time.timeScale = Paused ? 0 : 1;
             if (Paused) sounds.RunSaw(false);
@@ -83,6 +93,29 @@ namespace ZombieYard
 
         public void Restart()
         {
+            if (!Victory) LoadCycle(Cycle);
+        }
+
+        internal void Win()
+        {
+            if (Victory || Health.Current == 0) return;
+            Victory = true;
+            Paused = true;
+            sounds.RunSaw(false);
+            Time.timeScale = 0;
+            SetCursor(false);
+        }
+
+        public void ConfirmNewGamePlus()
+        {
+            if (Victory) LoadCycle(Cycle + 1);
+        }
+
+        private void LoadCycle(int cycle)
+        {
+            if (reloadingScene) return;
+            reloadingScene = true;
+            nextCycle = cycle;
             Time.timeScale = 1;
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
@@ -91,6 +124,7 @@ namespace ZombieYard
         {
             if (Gear == null) return;
             var keys = Keyboard.current;
+            if (Victory) return;
             if (Health.Current == 0)
             {
                 if (keys != null && keys.rKey.wasPressedThisFrame) Restart();
@@ -264,7 +298,7 @@ namespace ZombieYard
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 {
                     var target = Health.AtHit(hit);
-                    if (target && target != Health) { target.Damage(held.Config.melee.damage); MarkHit(); }
+                    if (target && target != Health) { target.Damage(held.Config.melee.damage, byPlayer: true); MarkHit(); }
                 }
                 return;
             }
@@ -322,7 +356,7 @@ namespace ZombieYard
                 if (target && target != Health) contactTargets.Add(target);
             }
             foreach (var target in contactTargets)
-                if (target && target.Current > 0) { target.Damage(blade.damage); MarkHit(); }
+                if (target && target.Current > 0) { target.Damage(blade.damage, byPlayer: true); MarkHit(); }
         }
 
         private void MarkHit() => HitUntil = Time.time + .14f;

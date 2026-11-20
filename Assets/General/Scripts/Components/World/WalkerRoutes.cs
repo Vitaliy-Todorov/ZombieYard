@@ -32,7 +32,7 @@ namespace ZombieYard
                 dirty = false;
                 next.Clear();
                 frontier.Clear();
-                if (Clear(goal, goal.y + height))
+                if (Clear(goal, goal.y + height, radius))
                 {
                     next.Add(goal, goal);
                     frontier.Enqueue(goal);
@@ -57,27 +57,27 @@ namespace ZombieYard
             foreach (var direction in Directions)
             {
                 var from = to + direction;
-                int highest = grid.Top(new Vector2Int(from.x, from.z)) + 1;
+                int highest = grid.WalkerTop(new Vector2Int(from.x, from.z)) + 1;
                 int lowest = Mathf.Max(grid.Bottom + 1, to.y - climb);
                 for (from.y = lowest; from.y <= highest; from.y++)
                 {
-                    if (grid.BlockAt(from + Vector3Int.down) == Voxel.Air || next.ContainsKey(from)) continue;
+                    if (!grid.WalkerSolid(from + Vector3Int.down) || next.ContainsKey(from)) continue;
                     // Raise before crossing a ledge, or cross before dropping. Check the
                     // swept body in both columns so a low overhang blocks that move.
                     int head = Mathf.Max(from.y, to.y) + height;
-                    if (!Clear(from, head) || (from.y > to.y && !Clear(to, head))) continue;
+                    if (!Clear(from, head, radius) || (from.y > to.y && !Clear(to, head, radius))) continue;
                     next.Add(from, to);
                     frontier.Enqueue(from);
                 }
             }
         }
 
-        private bool Clear(Vector3Int feet, int headExclusive)
+        internal bool Clear(Vector3Int feet, int headExclusive, int radius)
         {
             for (int x = feet.x - radius; x <= feet.x + radius; x++)
             for (int z = feet.z - radius; z <= feet.z + radius; z++)
             for (int y = feet.y; y < headExclusive; y++)
-                if (grid.BlockAt(new Vector3Int(x, y, z)) != Voxel.Air) return false;
+                if (grid.WalkerSolid(new Vector3Int(x, y, z))) return false;
             return true;
         }
     }

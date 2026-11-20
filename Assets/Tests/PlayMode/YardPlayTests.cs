@@ -66,7 +66,7 @@ namespace ZombieYard.Tests
             {
                 Assert.IsTrue(Physics.Raycast(top + Vector3.up, Vector3.down, out var hit));
                 var block = Health.AtHit(hit);
-                int hits = layer < 2 ? 1 : 4;
+                int hits = layer < 2 + scene.world.plateauHeight ? 1 : 4;
                 for (int i = 1; i <= hits; i++)
                 {
                     Assert.Greater(block.Current, 0);
@@ -104,21 +104,23 @@ namespace ZombieYard.Tests
             var player = scene.player;
             var body = player.GetComponent<CharacterController>();
             var start = player.transform.position;
+            scene.points = System.Array.Empty<Transform>();
             var lowland = new Vector2Int(scene.world.halfSize.x + scene.world.plateauHeight + 1, 0);
             Vector3 outside = scene.grid.Center(lowland);
             Assert.AreEqual((YardGrid.YardLevel - scene.world.plateauHeight) * scene.grid.Size, outside.y);
             body.enabled = false;
             player.transform.position = outside + Vector3.up * .03f;
             body.enabled = true;
-            yield return new WaitForSeconds(scene.world.fogInterval + .1f);
+            Assert.AreEqual(14.4f, scene.world.fogDamage, .001f);
+            yield return new WaitForSeconds(scene.world.fogInterval * 5 + .1f);
             Assert.IsTrue(player.Fog.Exposed);
-            Assert.AreEqual(player.config.hp - scene.world.fogDamage, player.Health.Current);
+            Assert.AreEqual(player.config.hp - 72, player.Health.Current);
             body.enabled = false;
             player.transform.position = start;
             body.enabled = true;
             yield return new WaitForSeconds(scene.world.fogInterval + .1f);
             Assert.IsFalse(player.Fog.Exposed);
-            Assert.AreEqual(player.config.hp - scene.world.fogDamage, player.Health.Current);
+            Assert.AreEqual(player.config.hp - 72, player.Health.Current);
         }
 
         [UnityTest]

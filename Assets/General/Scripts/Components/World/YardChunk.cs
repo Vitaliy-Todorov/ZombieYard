@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace ZombieYard
 {
-    internal enum Voxel { Air, Turf, Earth, Wood, Brick, Crate, Bark, Leaves, Metal, Stone, Bedrock }
+    internal enum Voxel { Air, Turf, Earth, Wood, Brick, Crate, Bark, Leaves, Metal, Stone, Bedrock, RoseStone, RoseBedrock, Pillar }
 
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
     public sealed class YardChunk : MonoBehaviour

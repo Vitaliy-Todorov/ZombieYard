@@ -239,6 +239,36 @@ namespace ZombieYard.Tests
         }
 
         [UnityTest]
+        public IEnumerator WalkerGoesAroundShopCountersToReachPlayer()
+        {
+            int floor = scene.grid.ShopFloorLevel;
+            // Open a gallery behind the row. Both ends now lead back into the shop.
+            for (int x = -3; x <= 3; x++)
+            for (int y = floor; y < floor + 2; y++)
+            {
+                var block = scene.grid.HealthAt(new Vector3Int(x, y, 3));
+                block.Damage(block.Current);
+            }
+            MovePlayer(new Vector3Int(0, floor - YardGrid.YardLevel, 0));
+            SpawnWalker(new Vector3Int(0, floor - YardGrid.YardLevel, 3));
+            var body = walker.GetComponent<CapsuleCollider>();
+            var colliders = new List<BoxCollider>();
+            foreach (var stand in Object.FindObjectsByType<ShopStand>(FindObjectsSortMode.None))
+                colliders.AddRange(stand.GetComponentsInChildren<BoxCollider>());
+            Assert.IsNotEmpty(colliders);
+            bool roundedEnd = false;
+            yield return UntilHit(() =>
+            {
+                roundedEnd |= Mathf.Abs(WalkerColumn.x) == 3 && WalkerColumn.y == 2;
+                foreach (var part in colliders)
+                    Assert.IsFalse(Physics.ComputePenetration(body, walker.transform.position, walker.transform.rotation,
+                        part, part.transform.position, part.transform.rotation, out _, out float depth) && depth > .005f,
+                        $"Walker entered {part.name} at {walker.transform.position}");
+            });
+            Assert.IsTrue(roundedEnd, "The walker must pass around one end of the counter row.");
+        }
+
+        [UnityTest]
         public IEnumerator WalkerEscapesToSurfaceAtConfiguredClimbThreshold()
         {
             var shaft = new Vector3Int(-3, -3, -2);

@@ -5,6 +5,7 @@ namespace ZombieYard
     [RequireComponent(typeof(YardPlayer))]
     public sealed class YardHud : MonoBehaviour
     {
+        internal ArenaEye Boss { private get; set; }
         private YardPlayer player;
         private GUIStyle label, button;
         private static readonly Color Ink = new(.065f, .09f, .085f, .94f);
@@ -44,9 +45,9 @@ namespace ZombieYard
             string time = System.TimeSpan.FromSeconds(player.Elapsed).ToString(@"mm\:ss");
             Fill(22, 22, 218, 85, Ink);
             Fill(22, 22, 4, 85, Amber);
-            Text(40, 28, 180, 24, "ZOMBIE YARD", 20, Paper, true);
-            Text(40, 54, 185, 20, time + "    /    УБИТО  " + player.Kills, 13, Muted, true);
-            Text(40, 77, 190, 23, "БАЛАНС   " + player.Score.Balance + " оч.", 16, Amber, true);
+            Text(40, 28, 195, 24, player.Cycle == 0 ? "ZOMBIE YARD" : $"ZOMBIE YARD · NG+{player.Cycle}", 18, Paper, true);
+            Text(40, 54, 185, 20, time, 13, Muted, true);
+            Text(40, 77, 190, 23, "Счёт   " + player.Score.Balance, 16, Amber, true);
 
             Fill(22, h - 82, 183, 60, Ink);
             Text(36, h - 75, 95, 24, "ЗДОРОВЬЕ", 13, Muted, true);
@@ -73,6 +74,15 @@ namespace ZombieYard
             if (hp.Current > 0 && !player.Paused)
             {
                 float x = w / 2, y = h / 2;
+                if (Boss && Boss.InAttackRange)
+                {
+                    var bossHP = Boss.Health;
+                    Fill(x - 175, 22, 350, 49, Ink);
+                    Text(x - 161, 25, 220, 26, "ГЛАЗ КРАСНОЙ ГОРЫ", 16, Paper, true);
+                    Text(x + 55, 25, 108, 26, $"{bossHP.Current} / {bossHP.Maximum}", 15, Paper, true, true);
+                    Fill(x - 161, 54, 322, 7, Muted);
+                    Fill(x - 161, 54, 322f * bossHP.Current / bossHP.Maximum, 7, Rust);
+                }
                 Color cross = Time.time < player.HitUntil ? Amber : Paper;
                 Fill(x - 7, y, 4, 2, cross); Fill(x + 4, y, 4, 2, cross);
                 Fill(x, y - 7, 2, 4, cross); Fill(x, y + 4, 2, 4, cross);
@@ -96,22 +106,29 @@ namespace ZombieYard
                 Fill(0, 0, w, h, new Color(.02f,.04f,.035f,.70f));
                 float x = w / 2 - 216, y = h / 2 - 111;
                 Fill(x, y, 432, 222, Ink); Fill(x, y, 432, 4, Amber);
-                Text(x, y + 16, 432, 48, hp.Current == 0 ? "Попытка окончена" : "Пауза", 30, Paper, true, true);
-                if (hp.Current == 0)
+                string title = player.Victory ? "Глаз повержен" : hp.Current == 0 ? "Попытка окончена" : "Пауза";
+                Text(x, y + 16, 432, 48, title, 30, Paper, true, true);
+                if (hp.Current == 0 || player.Victory)
                 {
                     Text(x, y + 76, 432, 32, "Время  " + time + "     /     Убито  " + player.Kills, 19, Muted, false, true);
                     var score = player.Score;
                     Text(x, y + 111, 432, 25, $"Обычные  {score.Normal}    Красные  {score.Red}    Фиолетовые  {score.Purple}", 16, Paper, false, true);
+                    string action = player.Victory ? $"Начать NG+{player.Cycle + 1}" : "Ещё попытка   [R]";
+                    if (GUI.Button(new Rect(x + 86, y + 159, 260, 42), action, button))
+                    {
+                        if (player.Victory) player.ConfirmNewGamePlus();
+                        else player.Restart();
+                    }
                 }
                 else
                 {
                     Text(x, y + 66, 432, 25, "WASD — ходьба   ·   Shift — бег   ·   Пробел — прыжок", 15, Paper, false, true);
                     Text(x, y + 93, 432, 25, "ЛКМ — атака   ·   R — зарядить   ·   E — взять оружие", 15, Paper, false, true);
                     Text(x, y + 120, 432, 25, "1–2 или колесо — слоты   ·   G — бросить оружие", 15, Paper, false, true);
-                }
-                if (GUI.Button(new Rect(x + 86, y + 159, 260, 42), hp.Current == 0 ? "Ещё попытка   [R]" : "Продолжить   [Esc]", button))
-                {
-                    if (hp.Current == 0) player.Restart(); else player.TogglePause();
+                    if (GUI.Button(new Rect(x + 12, y + 159, 210, 42), "Продолжить   [Esc]", button))
+                        player.TogglePause();
+                    if (GUI.Button(new Rect(x + 230, y + 159, 190, 42), "Перезапустить", button))
+                        player.Restart();
                 }
             }
             GUI.matrix = previous;

@@ -13,6 +13,7 @@ namespace ZombieYard
         public Transform[] points;
         public Transform riflePosition;
         public WeaponConfig rifle, staff, chainsaw;
+        public ArenaEye Eye { get; internal set; }
 
         protected override void Configure(IContainerBuilder builder)
         {

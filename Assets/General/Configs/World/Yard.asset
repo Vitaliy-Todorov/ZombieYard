@@ -40,8 +40,20 @@ MonoBehaviour:
     price: 12
     stock: 4
   staff:
-    price: 1000
+    price: 100
     stock: 1
+  eye:
+    prefab: {fileID: 7978881334776213084, guid: bbf2176d56b07b945bce14ea476be72a, type: 3}
+    hp: 720
+    laser: {fileID: 11400000, guid: 7e102c781c5620b4fbe828ccc9101ce1, type: 2}
+    trackingDegrees: 155
+    firingDegrees: 46
+    aimSeconds: 0.85
+    chargeSeconds: 1.15
+    fireSeconds: 2.4
+    cooldownSeconds: 1.6
+    tickSeconds: 0.2
+  arenaPillar: {fileID: 11400000, guid: 9ff710c63da68284c84c8e04ab4897c2, type: 2}
   plateauHeight: 4
   mountainDistance: 44
   fogDepthBelowYard: 2
@@ -52,5 +64,5 @@ MonoBehaviour:
   exteriorFogShader: {fileID: 4800000, guid: fe1a451b326444443bcb512431d17a73, type: 3}
   fogColor: {r: 0.55, g: 0.66, b: 0.56, a: 1}
   fogDensity: 0.13
-  fogDamage: 8
+  fogDamage: 14.4
   fogInterval: 1

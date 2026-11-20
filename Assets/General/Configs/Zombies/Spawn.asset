@@ -17,3 +17,12 @@ MonoBehaviour:
   minInterval: 3
   maxInterval: 5
   limit: 12
+  portalMaterial: {fileID: 2100000, guid: ec815ec9f99bcfc4abb0ac3ee59f0980, type: 2}
+  portalChance: 0.12
+  purpleChance: 0.2
+  portalSpacing: 6
+  undergroundMinInterval: 5
+  undergroundMaxInterval: 8
+  undergroundLimit: 4
+  arenaLimit: 3
+  arenaInterval: 4

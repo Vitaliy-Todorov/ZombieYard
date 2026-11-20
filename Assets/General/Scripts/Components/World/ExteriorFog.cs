@@ -14,7 +14,7 @@ namespace ZombieYard
         private FogVolume volume;
         private YardGrid grid;
         private YardPlayer player;
-        private int damage;
+        private float damage, damageRemainder;
         private float interval, exposure, flowInterval, flowTime;
         public bool Exposed { get; private set; }
 
@@ -90,7 +90,10 @@ namespace ZombieYard
             while (exposure >= interval && player.Health.Current > 0)
             {
                 exposure -= interval;
-                player.Health.Damage(damage);
+                damageRemainder += damage;
+                int wholeHP = Mathf.RoundToInt(damageRemainder);
+                damageRemainder -= wholeHP;
+                player.Health.Damage(wholeHP);
             }
         }
 

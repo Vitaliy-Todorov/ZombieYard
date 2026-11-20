@@ -53,7 +53,7 @@ namespace ZombieYard.Tests
             var grid = scene.grid;
             var body = Player.GetComponent<CharacterController>();
             body.enabled = false;
-            Player.transform.SetPositionAndRotation(new Vector3(x, grid.ShopFloorLevel, -.5f) * grid.Size
+            Player.transform.SetPositionAndRotation(new Vector3(x, grid.ShopFloorLevel, .5f) * grid.Size
                 + Vector3.up * .015f, Quaternion.identity);
             body.enabled = true;
             Physics.SyncTransforms();
@@ -150,7 +150,7 @@ namespace ZombieYard.Tests
         public IEnumerator MedkitsAndStaffChargeOnlyWhenReceived()
         {
             var world = scene.world;
-            Assert.AreEqual(1000, world.staff.price);
+            Assert.AreEqual(100, world.staff.price);
             int funds = world.staff.price + world.partialMedkit.price + world.fullMedkit.price;
             for (int i = 0; i < funds; i++) Player.Score.RecordKill(ZombieKind.Normal);
             yield return AtCounter(0);

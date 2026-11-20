@@ -88,7 +88,7 @@ namespace ZombieYard
         {
             var target = Health.AtHit(hit);
             if (!target || target.Current <= 0) return;
-            target.Damage(ammo.damage);
+            target.Damage(ammo.damage, byPlayer: true);
             onDamage?.Invoke();
         }
     }

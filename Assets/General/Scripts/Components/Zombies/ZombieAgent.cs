@@ -6,6 +6,8 @@ namespace ZombieYard
     public sealed class ZombieAgent : MonoBehaviour
     {
         public Transform leftLeg, rightLeg, torso;
+        [SerializeField] private Renderer[] variantParts;
+        private int strength;
         private YardGrid grid;
         private YardPlayer player;
         private ZombieConfig config;
@@ -18,10 +20,23 @@ namespace ZombieYard
         public Health Health { get; private set; }
         public ZombieKind Kind { get; private set; }
 
-        public void Initialize(ZombieConfig settings, YardGrid yard, YardPlayer target, Action<ZombieAgent> died)
+        public void Initialize(ZombieConfig settings, YardGrid yard, YardPlayer target, Action<ZombieAgent> died,
+            ZombieKind? kind = null)
         {
             config = settings;
-            Kind = settings.kind;
+            Kind = kind ?? settings.kind;
+            strength = Kind switch
+            {
+                ZombieKind.Red => settings.redStrength,
+                ZombieKind.Purple => settings.purpleStrength,
+                _ => 1
+            };
+            if (Kind != ZombieKind.Normal)
+            {
+                var palette = new MaterialPropertyBlock();
+                palette.SetColor("_BaseColor", Kind == ZombieKind.Red ? settings.redTint : settings.purpleTint);
+                foreach (var part in variantParts) part.SetPropertyBlock(palette);
+            }
             grid = yard;
             player = target;
             onDeath = died;
@@ -30,19 +45,19 @@ namespace ZombieYard
             radiusCells = Mathf.Max(0, Mathf.CeilToInt(body.extents.x / yard.Size - .5f));
             climbCells = Mathf.FloorToInt((config.maxClimbHeight + .001f) / yard.Size);
             Health = GetComponent<Health>();
-            Health.Initialize(settings.hp);
+            Health.Initialize(settings.hp * strength);
             Health.Died += Die;
             phase = UnityEngine.Random.Range(0f, 6f);
         }
 
         private void Update()
         {
-            if (!player || player.Health.Current == 0 || !gameObject.activeSelf) return;
+            if (!player || player.Paused || player.Health.Current == 0 || !gameObject.activeSelf) return;
             Vector3 delta = player.transform.position - transform.position;
             Vector3 flat = Vector3.ProjectOnPlane(delta, Vector3.up);
 
-            if (stepping && (grid.BlockAt(source + Vector3Int.down) == Voxel.Air ||
-                             grid.BlockAt(destination + Vector3Int.down) == Voxel.Air))
+            if (stepping && (!grid.WalkerSolid(source + Vector3Int.down) ||
+                             !grid.WalkerSolid(destination + Vector3Int.down)))
                 stepping = false;
 
             if (!stepping)
@@ -113,16 +128,22 @@ namespace ZombieYard
         {
             if (Time.time < nextAttack) return;
             nextAttack = Time.time + config.weapon.delay;
-            player.Health.Damage(attack.damage);
+            player.Health.Damage(attack.damage * strength);
         }
 
         private void Die()
         {
             foreach (var entry in config.loot)
             {
-                if (!entry.ammo || entry.chance <= 0 || UnityEngine.Random.value > entry.chance) continue;
-                int quantity = UnityEngine.Random.Range(entry.quantity.x, entry.quantity.y + 1);
-                if (quantity > 0) Pickup.ForAmmo(entry.ammo, quantity, transform.position + Vector3.up * .45f);
+                if (Kind < entry.minimumKind || entry.chance <= 0 || UnityEngine.Random.value > entry.chance) continue;
+                var position = transform.position + Vector3.up * .45f;
+                if (entry.weapon) Pickup.ForWeapon(new HeldWeapon(entry.weapon), position);
+                else if (entry.partialMedkit) Pickup.ForMedkit(player.config, false, position);
+                else if (entry.ammo)
+                {
+                    int quantity = UnityEngine.Random.Range(entry.quantity.x, entry.quantity.y + 1);
+                    if (quantity > 0) Pickup.ForAmmo(entry.ammo, quantity, position);
+                }
             }
             onDeath(this);
             gameObject.SetActive(false);

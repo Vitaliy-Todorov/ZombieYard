@@ -15,6 +15,13 @@ namespace ZombieYard
 
         public void Initialize(int maximum) => Current = Maximum = Mathf.Max(1, maximum);
 
+        public bool Heal(int amount)
+        {
+            if (amount <= 0 || Current <= 0 || Current == Maximum) return false;
+            Current += Mathf.Min(amount, Maximum - Current);
+            return true;
+        }
+
         public void Damage(int amount)
         {
             if (Current <= 0 || amount <= 0) return;

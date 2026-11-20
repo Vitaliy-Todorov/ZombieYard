@@ -38,7 +38,8 @@ namespace ZombieYard
 
         private void OnDeath(ZombieAgent zombie)
         {
-            if (living.Remove(zombie)) scene.player.CountKill();
+            if (living.Remove(zombie) && scene.player.Health.Current > 0)
+                scene.player.Score.RecordKill(zombie.Kind);
         }
     }
 }

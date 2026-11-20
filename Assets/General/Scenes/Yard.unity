@@ -25718,6 +25718,8 @@ MonoBehaviour:
   - {fileID: 2083981288}
   riflePosition: {fileID: 1229855645}
   rifle: {fileID: 11400000, guid: f751bedcc2fe28140abb249a8e400d4d, type: 2}
+  staff: {fileID: 11400000, guid: 48200c43e4b41494e9b7dc0cd418e1e1, type: 2}
+  chainsaw: {fileID: 11400000, guid: 84a202f9ff46b604bbaa9141cd42e847, type: 2}
 --- !u!4 &1975353074
 Transform:
   m_ObjectHideFlags: 0

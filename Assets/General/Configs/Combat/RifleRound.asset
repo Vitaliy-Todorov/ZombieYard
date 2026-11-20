@@ -13,10 +13,11 @@ MonoBehaviour:
   m_Name: RifleRound
   m_EditorClassIdentifier: ZombieYard.Runtime::ZombieYard.AmmoConfig
   title: "\u041F\u0430\u0442\u0440\u043E\u043D\u044B \u0434\u043B\u044F \u0440\u0443\u0436\u044C\u044F"
-  damage: 100
+  damage: 140
   projectiles: 1
   spreadDegrees: 0
   range: 70
   speed: 46
+  ricochetSeconds: 0
   projectilePrefab: {fileID: 2946035094633318569, guid: 2b954d730347ffd4eaaab32201c5fd3f, type: 3}
   pickupVisual: {fileID: 7920246060802218762, guid: b49605dd506012c4d89ecd3ca5f79f78, type: 3}

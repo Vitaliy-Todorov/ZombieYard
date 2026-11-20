@@ -42,10 +42,11 @@ namespace ZombieYard
             var hp = player.Health;
             var gear = player.Gear;
             string time = System.TimeSpan.FromSeconds(player.Elapsed).ToString(@"mm\:ss");
-            Fill(22, 22, 213, 61, Ink);
-            Fill(22, 22, 4, 61, Amber);
+            Fill(22, 22, 218, 85, Ink);
+            Fill(22, 22, 4, 85, Amber);
             Text(40, 28, 180, 24, "ZOMBIE YARD", 20, Paper, true);
             Text(40, 54, 185, 20, time + "    /    УБИТО  " + player.Kills, 13, Muted, true);
+            Text(40, 77, 190, 23, "БАЛАНС   " + player.Score.Balance + " оч.", 16, Amber, true);
 
             Fill(22, h - 82, 183, 60, Ink);
             Text(36, h - 75, 95, 24, "ЗДОРОВЬЕ", 13, Muted, true);
@@ -76,11 +77,12 @@ namespace ZombieYard
                 Fill(x - 7, y, 4, 2, cross); Fill(x + 4, y, 4, 2, cross);
                 Fill(x, y - 7, 2, 4, cross); Fill(x, y + 4, 2, 4, cross);
                 if (player.Fog && player.Fog.Exposed) Text(x - 175, y - 70, 350, 30, "Опасный туман · поднимитесь выше", 17, Amber, true, true);
-                string prompt = player.Notice ?? (player.Nearby ? "E   /   Подобрать · " + player.Nearby.Title : null);
+                string prompt = player.Notice ?? (player.AimedStand ? player.AimedStand.Prompt :
+                    player.Nearby ? "E   /   Подобрать · " + player.Nearby.Title : null);
                 if (prompt != null)
                 {
-                    Fill(x - 165, y + 28, 330, 32, Ink);
-                    Text(x - 165, y + 28, 330, 32, prompt, 15, Paper, true, true);
+                    Fill(x - 250, y + 28, 500, 32, Ink);
+                    Text(x - 250, y + 28, 500, 32, prompt, 15, Paper, true, true);
                 }
                 if (player.Elapsed < 14)
                 {
@@ -96,7 +98,11 @@ namespace ZombieYard
                 Fill(x, y, 432, 222, Ink); Fill(x, y, 432, 4, Amber);
                 Text(x, y + 16, 432, 48, hp.Current == 0 ? "Попытка окончена" : "Пауза", 30, Paper, true, true);
                 if (hp.Current == 0)
+                {
                     Text(x, y + 76, 432, 32, "Время  " + time + "     /     Убито  " + player.Kills, 19, Muted, false, true);
+                    var score = player.Score;
+                    Text(x, y + 111, 432, 25, $"Обычные  {score.Normal}    Красные  {score.Red}    Фиолетовые  {score.Purple}", 16, Paper, false, true);
+                }
                 else
                 {
                     Text(x, y + 66, 432, 25, "WASD — ходьба   ·   Shift — бег   ·   Пробел — прыжок", 15, Paper, false, true);

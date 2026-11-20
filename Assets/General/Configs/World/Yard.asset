@@ -18,14 +18,39 @@ MonoBehaviour:
   fence: {fileID: 11400000, guid: d49434dc7f5016440b32669e78958396, type: 2}
   masonry: {fileID: 11400000, guid: 51d7a036592954649b3735b3ac6e160e, type: 2}
   supplyCrate: {fileID: 11400000, guid: dc387f0e945f66744af3e16dfe6aa576, type: 2}
-  plateauHeight: 5
+  shopCounter: {fileID: 1752894931442724142, guid: 8b54ae2de50207e4d993f5eb2713b902, type: 3}
+  shells:
+    pack:
+      ammo: {fileID: 11400000, guid: d24f361a1ddffaf489014811010a22f3, type: 2}
+      count: 6
+    terms:
+      price: 3
+      stock: 20
+  rifleRounds:
+    pack:
+      ammo: {fileID: 11400000, guid: 8d89e37f0a6269e48b5f5e7a38c9f386, type: 2}
+      count: 3
+    terms:
+      price: 4
+      stock: 20
+  partialMedkit:
+    price: 5
+    stock: 8
+  fullMedkit:
+    price: 12
+    stock: 4
+  staff:
+    price: 1000
+    stock: 1
+  plateauHeight: 4
   mountainDistance: 44
   fogDepthBelowYard: 2
   fogFlowInterval: 0.12
-  subsoilDepth: 3
-  fogDamage: 8
-  fogInterval: 1
-  fogDensity: 0.13
+  subsoilDepth: 13
+  subsoilHpMultiplier: 4
+  terrainMaterial: {fileID: 2100000, guid: 65702de16795f21459abaace7066feb3, type: 2}
   exteriorFogShader: {fileID: 4800000, guid: fe1a451b326444443bcb512431d17a73, type: 3}
   fogColor: {r: 0.55, g: 0.66, b: 0.56, a: 1}
-  terrainMaterial: {fileID: 2100000, guid: 65702de16795f21459abaace7066feb3, type: 2}
+  fogDensity: 0.13
+  fogDamage: 8
+  fogInterval: 1

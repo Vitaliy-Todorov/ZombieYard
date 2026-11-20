@@ -9,19 +9,26 @@ namespace ZombieYard
         private YardGrid grid;
         private YardPlayer player;
         private ZombieConfig config;
-        private Vector2Int destination;
+        private Vector3Int source, destination;
+        private int heightCells, radiusCells, climbCells;
         private Vector3 start;
         private float stepTime, duration, nextAttack, phase;
-        private bool stepping, climb;
+        private bool stepping;
         private Action<ZombieAgent> onDeath;
         public Health Health { get; private set; }
+        public ZombieKind Kind { get; private set; }
 
         public void Initialize(ZombieConfig settings, YardGrid yard, YardPlayer target, Action<ZombieAgent> died)
         {
             config = settings;
+            Kind = settings.kind;
             grid = yard;
             player = target;
             onDeath = died;
+            var body = GetComponent<CapsuleCollider>().bounds;
+            heightCells = Mathf.CeilToInt(body.size.y / yard.Size);
+            radiusCells = Mathf.Max(0, Mathf.CeilToInt(body.extents.x / yard.Size - .5f));
+            climbCells = Mathf.FloorToInt((config.maxClimbHeight + .001f) / yard.Size);
             Health = GetComponent<Health>();
             Health.Initialize(settings.hp);
             Health.Died += Die;
@@ -34,52 +41,59 @@ namespace ZombieYard
             Vector3 delta = player.transform.position - transform.position;
             Vector3 flat = Vector3.ProjectOnPlane(delta, Vector3.up);
 
-            var attack = config.weapon.melee;
-            if (delta.magnitude <= attack.range &&
-                (!Physics.Linecast(transform.position + Vector3.up * .85f, player.transform.position + Vector3.up,
-                    out var hit, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) || hit.collider.GetComponentInParent<YardPlayer>() == player))
-            {
-                Face(flat);
-                Strike(attack);
-                return;
-            }
+            if (stepping && (grid.BlockAt(source + Vector3Int.down) == Voxel.Air ||
+                             grid.BlockAt(destination + Vector3Int.down) == Voxel.Air))
+                stepping = false;
 
-            var cell = grid.Cell(transform.position);
-            if (float.IsNegativeInfinity(grid.Height(cell)) && !stepping)
-            {
-                transform.position += Vector3.down * (8 * Time.deltaTime);
-                if (transform.position.y < grid.VoidHeight) Health.Damage(Health.Current);
-                return;
-            }
-            if (!stepping && grid.Height(cell) < transform.position.y - .03f)
-            {
-                transform.position = Vector3.MoveTowards(transform.position, new Vector3(transform.position.x, grid.Height(cell), transform.position.z), 8 * Time.deltaTime);
-                return;
-            }
             if (!stepping)
             {
-                var target = grid.Cell(player.transform.position);
-                if (!grid.NextStep(cell, target, config.maxClimbHeight, out destination)) return;
-                if (cell == target)
+                bool grounded = grid.TryGround(transform.position, out source);
+                float floor = grounded ? source.y * grid.Size : grid.VoidHeight - 1;
+                if (!grounded || transform.position.y > floor + .03f)
+                {
+                    var feet = transform.position;
+                    feet.y = Mathf.MoveTowards(feet.y, floor, 8 * Time.deltaTime);
+                    transform.position = feet;
+                    if (feet.y < grid.VoidHeight) Health.Damage(Health.Current);
+                    return;
+                }
+
+                var attack = config.weapon.melee;
+                if (delta.magnitude <= attack.range &&
+                    (!Physics.Linecast(transform.position + Vector3.up * .85f, player.transform.position + Vector3.up,
+                        out var hit, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) || hit.collider.GetComponentInParent<YardPlayer>() == player))
+                {
+                    Face(flat);
+                    Strike(attack);
+                    return;
+                }
+
+                if (!grid.TryGround(player.transform.position, out var target) ||
+                    !grid.Routes.NextStep(source, target, climbCells, heightCells, radiusCells, out destination)) return;
+                if (source == target)
                 {
                     Face(flat);
                     transform.position += Vector3.ClampMagnitude(flat, config.speed * Time.deltaTime);
                     return;
                 }
                 start = transform.position;
-                climb = grid.Height(destination) > start.y + .1f;
-                duration = climb ? config.climbDuration : Vector3.Distance(start, grid.Center(destination)) / config.speed;
+                var goal = (Vector3)destination * grid.Size;
+                float distance = Vector3.ProjectOnPlane(goal - start, Vector3.up).magnitude + Mathf.Abs(goal.y - start.y);
+                duration = destination.y > source.y ? config.climbDuration : distance / config.speed;
                 stepTime = 0;
                 stepping = true;
             }
-            Vector3 end = grid.Center(destination);
-            if (float.IsNegativeInfinity(end.y)) { stepping = false; return; }
+            Vector3 end = (Vector3)destination * grid.Size;
+            // Follow the same two segments that the route checked for clearance.
+            Vector3 corner = destination.y > source.y ? new Vector3(start.x, end.y, start.z)
+                                                       : new Vector3(end.x, start.y, end.z);
             stepTime += Time.deltaTime;
             float t = Mathf.Clamp01(stepTime / Mathf.Max(.01f, duration));
-            Vector3 position = Vector3.Lerp(start, end, t);
-            if (climb) position.y = Mathf.Lerp(start.y, end.y, Mathf.Clamp01(t * 2.4f));
-            Face(position - transform.position);
-            transform.position = position;
+            float first = Vector3.Distance(start, corner);
+            float travel = t * (first + Vector3.Distance(corner, end));
+            Face(end - start);
+            transform.position = travel < first ? Vector3.MoveTowards(start, corner, travel)
+                                                : Vector3.MoveTowards(corner, end, travel - first);
             stepping = t < 1;
             float stride = Mathf.Sin(Time.time * 8 + phase);
             leftLeg.localRotation = Quaternion.Euler(stride * 24, 0, 0);

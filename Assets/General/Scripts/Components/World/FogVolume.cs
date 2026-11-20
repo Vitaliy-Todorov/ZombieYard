@@ -32,14 +32,25 @@ namespace ZombieYard
             chunkTotals = new int[chunksX * chunksZ];
             amounts = new byte[chunkTotals.Length * ChunkLength];
 
-            // The generated terrain has solid ground columns. Fill their exposed lowlands
-            // once at creation; opening more capacity later never creates additional fog.
+            // Seed exposed lowlands at the waterline, then follow the same downward
+            // and sideways paths available to flowing fog.
+            var frontier = new Queue<Vector3Int>();
+            void Fill(Vector3Int cell)
+            {
+                int index = Index(cell);
+                if (index < 0 || amounts[index] != 0 || grid.BlockAt(cell) != Voxel.Air) return;
+                SetAmount(index, byte.MaxValue);
+                frontier.Enqueue(cell);
+            }
             for (int z = -extent.y; z <= extent.y; z++)
             for (int x = -extent.x; x <= extent.x; x++)
-            for (int y = grid.Bottom; y < ceiling; y++)
+                if (grid.Top(new Vector2Int(x, z)) < ceiling - 1)
+                    Fill(new Vector3Int(x, ceiling - 1, z));
+            while (frontier.Count > 0)
             {
-                var cell = new Vector3Int(x, y, z);
-                if (grid.BlockAt(cell) == Voxel.Air) SetAmount(Index(cell), byte.MaxValue);
+                var cell = frontier.Dequeue();
+                Fill(cell + Vector3Int.down);
+                foreach (var side in Sides) Fill(cell + side);
             }
         }
 

@@ -33,6 +33,28 @@ namespace ZombieYard.Tests
         }
 
         [Test]
+        public void HealingCapsAtMaximumAndCannotRevive()
+        {
+            var obj = new GameObject();
+            try
+            {
+                var health = obj.AddComponent<Health>();
+                health.Initialize(100);
+                Assert.IsFalse(health.Heal(35));
+                health.Damage(80);
+                Assert.IsFalse(health.Heal(-1));
+                Assert.IsTrue(health.Heal(35));
+                Assert.AreEqual(55, health.Current);
+                Assert.IsTrue(health.Heal(int.MaxValue));
+                Assert.AreEqual(100, health.Current);
+                health.Damage(100);
+                Assert.IsFalse(health.Heal(int.MaxValue));
+                Assert.AreEqual(0, health.Current);
+            }
+            finally { Object.DestroyImmediate(obj); }
+        }
+
+        [Test]
         public void LethalDamageRaisesDeathOnlyOnce()
         {
             var obj = new GameObject();

@@ -14,7 +14,9 @@ namespace ZombieYard
         public Health Health { get; private set; }
         public Inventory Gear { get; private set; }
         public Pickup Nearby { get; private set; }
-        public int Kills { get; private set; }
+        public RunScore Score { get; } = new();
+        public int Kills => Score.Total;
+        public ShopStand AimedStand { get; private set; }
         public float Elapsed { get; private set; }
         public float HitUntil { get; private set; }
         public float HurtUntil { get; private set; }
@@ -31,6 +33,7 @@ namespace ZombieYard
         private YardSounds sounds;
         private Collider[] nearbyColliders = new Collider[40];
         private Transform muzzle;
+        private readonly System.Collections.Generic.HashSet<Health> contactTargets = new();
         private float voidHeight;
 
         public void Initialize(float voidHeight)
@@ -50,9 +53,12 @@ namespace ZombieYard
             SetCursor(true);
         }
 
-        public void CountKill() => Kills++;
         private void OnHurt() { HurtUntil = Time.time + .3f; sounds.Play(YardCue.Hurt); }
-        private void OnDeath() => SetCursor(false);
+        private void OnDeath()
+        {
+            sounds.RunSaw(false);
+            SetCursor(false);
+        }
         private static void SetCursor(bool locked)
         {
             Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
@@ -71,6 +77,7 @@ namespace ZombieYard
         {
             Paused = !Paused;
             Time.timeScale = Paused ? 0 : 1;
+            if (Paused) sounds.RunSaw(false);
             SetCursor(!Paused);
         }
 
@@ -116,8 +123,13 @@ namespace ZombieYard
                     input["Previous"].WasPressedThisFrame() || wheel > 0 ? -1 : 0;
                 Gear.Select((Gear.Selected + step + Gear.Slots.Length) % Gear.Slots.Length);
             }
-            Nearby = CollectAmmoAndFindWeapon();
-            if (input["Interact"].WasPressedThisFrame() && Nearby)
+            Nearby = CollectSuppliesAndFindWeapon();
+            AimedStand = Physics.Raycast(eyes.transform.position, eyes.transform.forward, out var target,
+                config.pickupReach, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                ? target.collider.GetComponentInParent<ShopStand>() : null;
+            if (input["Interact"].WasPressedThisFrame() && AimedStand)
+                Message(AimedStand.Buy(Score));
+            else if (input["Interact"].WasPressedThisFrame() && Nearby)
             {
                 if (Nearby.Collect(Gear)) { Nearby = null; sounds.Play(YardCue.Take); }
                 else Message("Слоты заняты · G — бросить оружие");
@@ -137,12 +149,15 @@ namespace ZombieYard
             }
             if (input["Reload"].WasPressedThisFrame()) Gear.StartReload(Time.time);
             ShowWeapon();
-            if (input["Attack"].IsPressed()) Attack();
+            bool attacking = input["Attack"].IsPressed();
+            bool sawing = attacking && shown.melee && shown.melee.contactRadius > 0;
+            sounds.RunSaw(sawing);
+            if (attacking) Attack();
             float cycle = Mathf.Min(.36f, shown.delay);
             kick = Mathf.MoveTowards(kick, 0, Time.deltaTime / (shown.diggingMotion ? cycle : .25f));
             float bob = Mathf.Sin(Elapsed * speed * 1.9f) * move.magnitude * .012f;
-            float reach = shown.diggingMotion ? .32f * Mathf.Sin(Mathf.PI * kick) : -kick * .09f;
-            float swing = shown.diggingMotion ? 0 : (shown.UsesAmmo ? -10 : 38) * kick;
+            float reach = sawing ? .012f * Mathf.Sin(Time.time * 94) : shown.diggingMotion ? .32f * Mathf.Sin(Mathf.PI * kick) : -kick * .09f;
+            float swing = shown.diggingMotion ? 0 : (shown.melee && shown.melee.contactRadius > 0 ? 3 : shown.melee ? 38 : -10) * kick;
             hand.localPosition = rest + new Vector3(bob, Mathf.Abs(bob) - (Gear.Reloading ? .13f : 0), reach);
             hand.localRotation = Quaternion.Euler(swing + (Gear.Reloading ? 24 : 0), -6, -3);
         }
@@ -164,7 +179,7 @@ namespace ZombieYard
             }
         }
 
-        private Pickup CollectAmmoAndFindWeapon()
+        private Pickup CollectSuppliesAndFindWeapon()
         {
             Vector3 chest = transform.TransformPoint(body.center);
             Vector3 eye = eyes.transform.position;
@@ -178,19 +193,20 @@ namespace ZombieYard
             Pickup best = null;
             float nearest = config.pickupReach;
             bool collectedAmmo = false;
+            int hpBefore = Health.Current;
             for (int i = 0; i < total; i++)
             {
                 var collider = nearbyColliders[i];
                 if (!collider.TryGetComponent<Pickup>(out var pickup)) continue;
-                Vector3 origin = pickup.IsAmmo ? chest : eye;
+                Vector3 origin = pickup.Automatic ? chest : eye;
                 Vector3 offset = collider.bounds.center - origin;
                 float distance = offset.magnitude;
                 if (distance > config.pickupReach) continue;
                 if (Physics.Linecast(origin, collider.bounds.center, out var hit, Physics.DefaultRaycastLayers,
                     QueryTriggerInteraction.Ignore) && hit.collider != collider) continue;
-                if (pickup.IsAmmo)
+                if (pickup.Automatic)
                 {
-                    collectedAmmo |= pickup.Collect(Gear);
+                    if (pickup.Collect(Gear, Health)) collectedAmmo |= pickup.IsAmmo;
                 }
                 else if (distance <= nearest && Vector3.Dot(offset.normalized, eyes.transform.forward) >= .25f)
                 {
@@ -198,7 +214,12 @@ namespace ZombieYard
                     best = pickup;
                 }
             }
-            if (collectedAmmo) { sounds.Play(YardCue.Take); Message("Патроны подобраны"); }
+            int healed = Health.Current - hpBefore;
+            if (collectedAmmo || healed > 0)
+            {
+                sounds.Play(YardCue.Take);
+                Message(healed > 0 ? $"Здоровье +{healed}" : "Патроны подобраны");
+            }
             return best;
         }
 
@@ -231,8 +252,13 @@ namespace ZombieYard
             }
             kick = 1;
             var view = eyes.transform;
-            if (!held.Config.UsesAmmo)
+            if (held.Config.melee)
             {
+                if (held.Config.melee.contactRadius > 0)
+                {
+                    SawContact(view, held.Config.melee);
+                    return;
+                }
                 sounds.Play(YardCue.Swing);
                 if (Physics.Raycast(view.position, view.forward, out var hit, held.Config.melee.range,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
@@ -243,8 +269,8 @@ namespace ZombieYard
                 return;
             }
             sounds.Play(YardCue.Shot);
-            held.Fire();
-            var ammo = held.Ammo;
+            if (held.Config.UsesAmmo) held.Fire();
+            var ammo = held.Config.staffBolt ? held.Config.staffBolt : held.Ammo;
             ShowWeapon();
             var start = muzzle ? muzzle.position : hand.position;
             bool nearCover = Physics.Linecast(view.position, start, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
@@ -268,6 +294,35 @@ namespace ZombieYard
                 Vector3 heading = alignment * new Vector3(offset.x * radius, offset.y * radius, 1);
                 Instantiate(ammo.projectilePrefab).Launch(ammo, start, heading, MarkHit);
             }
+        }
+
+        private void SawContact(Transform view, AttackConfig blade)
+        {
+            contactTargets.Clear();
+            float radius = Mathf.Min(blade.contactRadius, blade.range * .5f);
+            Vector3 start = view.position + view.forward * radius;
+            // Keep the centre of the blade effective even when the initial sphere overlaps a chunk.
+            if (Physics.Raycast(view.position, view.forward, out var center, blade.range,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                var target = Health.AtHit(center);
+                if (target && target != Health) contactTargets.Add(target);
+            }
+            var contacts = Physics.SphereCastAll(start, radius, view.forward, blade.range - radius * 2,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            foreach (var contact in contacts)
+            {
+                Vector3 point = contact.distance > 0 ? contact.point : contact.collider.bounds.center;
+                Vector3 offset = point - view.position;
+                // A ray resolves the visible voxel triangle and blocks contact through cover.
+                if (!Physics.Raycast(view.position, offset, out var face, Mathf.Min(offset.magnitude, blade.range) + .015f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) continue;
+                if (face.collider != contact.collider) continue;
+                var target = Health.AtHit(face);
+                if (target && target != Health) contactTargets.Add(target);
+            }
+            foreach (var target in contactTargets)
+                if (target && target.Current > 0) { target.Damage(blade.damage); MarkHit(); }
         }
 
         private void MarkHit() => HitUntil = Time.time + .14f;

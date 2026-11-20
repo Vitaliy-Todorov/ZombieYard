@@ -12,7 +12,7 @@ namespace ZombieYard
         public ZombieSpawnerConfig spawn;
         public Transform[] points;
         public Transform riflePosition;
-        public WeaponConfig rifle;
+        public WeaponConfig rifle, staff, chainsaw;
 
         protected override void Configure(IContainerBuilder builder)
         {

@@ -7,7 +7,7 @@
 | Universal RP · `com.unity.render-pipelines.universal` | 17.3.0 | Рендер участка и оружия. ExteriorFog использует текстуру глубины камеры URP |
 | Input System · `com.unity.inputsystem` | 1.20.0 | Ввод от первого лица. В карте Player уже есть Move, Look, Attack, Interact, Jump, Previous, Next и Sprint |
 | VContainer · `jp.hadashikick.vcontainer` | 1.19.0, Git-тег | Сборка зависимостей сцены и время жизни сервиса спавна |
-| AI Navigation · `com.unity.ai.navigation` | 2.0.14 | Пакет установлен. В игровом прототипе маршрут рассчитывает YardGrid по высотам ячеек участка |
+| AI Navigation · `com.unity.ai.navigation` | 2.0.14 | Пакет установлен. В игровом прототипе WalkerRoutes строит пути по опорам и свободным объёмам блочной сетки YardGrid |
 | Test Framework · `com.unity.test-framework` | 1.6.0 | EditMode проверяет здоровье и инвентарь. PlayMode проверяет бой, устройство ям, подбор и спавн в сцене Yard |
 | MCP for Unity · `com.coplaydev.unity-mcp` | Локально 10.3.0, в манифесте ветка `main` | Инструмент агента для работы с редактором. Точную Git-ревизию текущей установки хранит lock-файл |
 

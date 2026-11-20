@@ -2,6 +2,19 @@ using UnityEngine;
 
 namespace ZombieYard
 {
+    [System.Serializable]
+    public struct ShopTerms
+    {
+        [Min(0)] public int price, stock;
+    }
+
+    [System.Serializable]
+    public struct AmmoDeal
+    {
+        public AmmoStack pack;
+        public ShopTerms terms;
+    }
+
     [CreateAssetMenu(menuName = "Zombie Yard/World")]
     public sealed class WorldConfig : ScriptableObject
     {
@@ -9,11 +22,18 @@ namespace ZombieYard
         public Vector2Int halfSize = new Vector2Int(10, 8);
         [Min(.25f)] public float blockSize = 1.25f;
         public BlockConfig soil, fence, masonry, supplyCrate;
-        [Min(1)] public int plateauHeight = 5;
+        [Header("Underground shop")]
+        public GameObject shopCounter;
+        public AmmoDeal shells, rifleRounds;
+        public ShopTerms partialMedkit, fullMedkit, staff;
+        [Header("Terrain and fog")]
+        [Min(1)] public int plateauHeight = 4;
         [Min(10)] public int mountainDistance = 44;
+        [Tooltip("Waterline depth below world zero, in blocks.")]
         [Min(1)] public int fogDepthBelowYard = 2;
         [Min(.02f)] public float fogFlowInterval = .12f;
-        [Min(2)] public int subsoilDepth = 3;
+        [Min(1)] public int subsoilDepth = 13;
+        [Min(1)] public int subsoilHpMultiplier = 4;
         [UnityEngine.Serialization.FormerlySerializedAs("pitFloorMaterial")]
         public Material terrainMaterial;
         public Shader exteriorFogShader;

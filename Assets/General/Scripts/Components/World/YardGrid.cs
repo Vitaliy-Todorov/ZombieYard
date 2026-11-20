@@ -10,11 +10,7 @@ namespace ZombieYard
         private readonly Dictionary<Vector3Int, Health> damaged = new();
         private readonly Dictionary<Vector2Int, int> tops = new();
         private readonly Dictionary<Vector2Int, YardChunk> chunks = new();
-        private readonly Dictionary<Vector2Int, Vector2Int> next = new();
-        private readonly Queue<Vector2Int> frontier = new();
-        private Vector2Int lastTarget;
-        private bool dirty = true;
-        private float lastClimb;
+        internal WalkerRoutes Routes { get; private set; }
         private int soilHp, woodHp, brickHp, crateHp;
         private Material material;
         private Texture2D atlas;
@@ -28,6 +24,7 @@ namespace ZombieYard
 
         public void Build(WorldConfig config, Vector3 supplyPosition)
         {
+            Routes = new WalkerRoutes(this);
             soilHp = config.soil.hp;
             woodHp = config.fence.hp;
             brickHp = config.masonry.hp;
@@ -128,7 +125,7 @@ namespace ZombieYard
             if (y > Top(column)) tops[column] = y;
         }
 
-        internal Health HealthAt(Vector3Int cell)
+        public Health HealthAt(Vector3Int cell)
         {
             var kind = BlockAt(cell);
             if (kind == Voxel.Air) return null;
@@ -157,6 +154,7 @@ namespace ZombieYard
         private void Remove(Vector3Int cell)
         {
             blocks.Remove(cell);
+            Routes.Invalidate();
             BlockRemoved?.Invoke(cell);
             var column = new Vector2Int(cell.x, cell.z);
             if (Top(column) == cell.y)
@@ -164,7 +162,6 @@ namespace ZombieYard
                 int y = cell.y - 1;
                 while (y >= Bottom && BlockAt(new Vector3Int(cell.x, y, cell.z)) == Voxel.Air) y--;
                 tops[column] = y;
-                dirty = true;
             }
             var owner = new Vector2Int(ChunkIndex(cell.x), ChunkIndex(cell.z));
             chunks[owner].Rebuild();
@@ -196,36 +193,23 @@ namespace ZombieYard
             if (material) Destroy(material);
         }
 
-        public bool NextStep(Vector2Int from, Vector2Int target, float climb, out Vector2Int result)
+        // Project feet onto the first supporting block below them, including under a roof.
+        internal bool TryGround(Vector3 feet, out Vector3Int stand)
         {
-            if (dirty || lastTarget != target || lastClimb != climb)
+            var column = Cell(feet);
+            int top = Top(column);
+            int y = Mathf.Min(top, Mathf.FloorToInt((feet.y + .04f) / Size) - 1);
+            stand = new Vector3Int(column.x, y + 1, column.y);
+            while (y >= Bottom)
             {
-                lastTarget = target;
-                lastClimb = climb;
-                dirty = false;
-                next.Clear();
-                frontier.Clear();
-                if (!float.IsNegativeInfinity(Height(target)))
+                if (y == top || BlockAt(new Vector3Int(column.x, y, column.y)) != Voxel.Air)
                 {
-                    next[target] = target;
-                    frontier.Enqueue(target);
+                    stand.y = y + 1;
+                    return true;
                 }
-                while (frontier.Count > 0)
-                {
-                    var cell = frontier.Dequeue();
-                    float height = Height(cell);
-                    foreach (var direction in Neighbors)
-                    {
-                        var neighbor = cell + direction;
-                        if (next.ContainsKey(neighbor)) continue;
-                        float other = Height(neighbor);
-                        if (float.IsNegativeInfinity(other) || height - other > climb + .001f) continue;
-                        next.Add(neighbor, cell);
-                        frontier.Enqueue(neighbor);
-                    }
-                }
+                y--;
             }
-            return next.TryGetValue(from, out result);
+            return false;
         }
     }
 }

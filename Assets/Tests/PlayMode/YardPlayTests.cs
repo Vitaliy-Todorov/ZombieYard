@@ -242,10 +242,8 @@ namespace ZombieYard.Tests
             Assert.Greater(peak - rest.z, .18f);
             Assert.AreEqual(rest.z, hand.localPosition.z, .01f);
 
-            var source = new Vector2Int(-4, 2);
-            var target = scene.grid.Cell(player.transform.position);
-            Assert.IsTrue(scene.grid.NextStep(source, target, scene.spawn.zombie.maxClimbHeight, out var next));
-            var direction = (scene.grid.Center(next) - scene.grid.Center(source)).normalized;
+            var source = scene.grid.Cell(player.transform.position) + Vector2Int.left * 4;
+            var direction = Vector3.right;
             var zombie = Object.Instantiate(scene.spawn.prefab, scene.grid.Center(source), Quaternion.LookRotation(-direction));
             zombie.Initialize(scene.spawn.zombie, scene.grid, player, _ => { });
             yield return new WaitForSeconds(.42f);

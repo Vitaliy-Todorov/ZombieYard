@@ -12,7 +12,7 @@
 
 ## Проверка и сборка
 
-- **Тесты.** Открой `Window → General → Test Runner`. По очереди запусти EditMode и PlayMode. Для автоматической проверки боя, подбора, ям и спавна PlayMode-тесты загружают сцену Yard. [Покрытие тестами](Docs/IMPLEMENTATION_STATUS.md)
+- **Тесты.** Открой `Window → General → Test Runner`. По очереди запусти EditMode и PlayMode. Для автоматической проверки боя, подбора, ям и спавна PlayMode-тесты загружают сцену Yard. Чтобы повторить подземную погоню, выбери `CavePursuitTests` на вкладке PlayMode и нажми Run Selected. Каждый тест выкапывает свою пещеру в свежем участке. [Покрытие тестами](Docs/IMPLEMENTATION_STATUS.md)
 - **Windows x64.** В `File → Build Profiles` выбери Windows и архитектуру Intel 64-bit. В Scene List первой должна стоять сцена Yard. Нажми Build и выбери `Builds/Windows`. Запускай `ZombieYard.exe` из этой папки. При передаче сборки сохрани рядом с ним папку данных и библиотеки Unity. [Список сцен](ProjectSettings/EditorBuildSettings.asset)
 
 ## Что хранить в Git

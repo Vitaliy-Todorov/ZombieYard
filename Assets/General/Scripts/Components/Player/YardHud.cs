@@ -1,3 +1,7 @@
+// Ответственности
+// - Показывает состояние игрока, оружия и босса, подсказки и результат попытки.
+// - Передаёт игроку команды из меню паузы и финального экрана.
+
 using UnityEngine;
 
 namespace ZombieYard
@@ -5,6 +9,7 @@ namespace ZombieYard
     [RequireComponent(typeof(YardPlayer))]
     public sealed class YardHud : MonoBehaviour
     {
+        internal ExteriorFog Fog { private get; set; }
         internal ArenaEye Boss { private get; set; }
         private YardPlayer player;
         private GUIStyle label, button;
@@ -86,7 +91,7 @@ namespace ZombieYard
                 Color cross = Time.time < player.HitUntil ? Amber : Paper;
                 Fill(x - 7, y, 4, 2, cross); Fill(x + 4, y, 4, 2, cross);
                 Fill(x, y - 7, 2, 4, cross); Fill(x, y + 4, 2, 4, cross);
-                if (player.Fog && player.Fog.Exposed) Text(x - 175, y - 70, 350, 30, "Опасный туман · поднимитесь выше", 17, Amber, true, true);
+                if (Fog && Fog.Exposed) Text(x - 175, y - 70, 350, 30, "Опасный туман · поднимитесь выше", 17, Amber, true, true);
                 string prompt = player.Notice ?? (player.AimedStand ? player.AimedStand.Prompt :
                     player.Nearby ? "E   /   Подобрать · " + player.Nearby.Title : null);
                 if (prompt != null)

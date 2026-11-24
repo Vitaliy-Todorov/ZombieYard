@@ -1,3 +1,7 @@
+// Ответственности
+// - Строит участок при старте попытки и инициализирует игрока и туман.
+// - Размещает ружьё, магазин и содержимое арены, связывает прилавки с выдачей товаров.
+
 using UnityEngine;
 using VContainer.Unity;
 
@@ -6,7 +10,12 @@ namespace ZombieYard
     public sealed class WorldBootstrap : IStartable
     {
         private readonly GameLifetimeScope scene;
-        public WorldBootstrap(GameLifetimeScope scene) => this.scene = scene;
+        private readonly ZombieSpawnService spawner;
+        public WorldBootstrap(GameLifetimeScope scene, ZombieSpawnService spawner)
+        {
+            this.scene = scene;
+            this.spawner = spawner;
+        }
         public void Start()
         {
             Vector3 yardOffset = Vector3.up * (YardGrid.YardLevel * scene.world.blockSize);
@@ -15,12 +24,14 @@ namespace ZombieYard
             scene.player.transform.position += yardOffset;
             Physics.SyncTransforms();
             scene.player.Initialize(scene.grid.VoidHeight);
-            scene.player.Fog = new GameObject("Exterior fog").AddComponent<ExteriorFog>();
-            scene.player.Fog.Initialize(scene.world, scene.grid, scene.player);
+            var fog = new GameObject("Exterior fog").AddComponent<ExteriorFog>();
+            fog.Initialize(scene.world, scene.grid, scene.player);
+            scene.player.GetComponent<YardHud>().Fog = fog;
             supply.y = Mathf.Max(supply.y, scene.grid.Height(scene.grid.Cell(supply)) + .22f);
-            Pickup.ForWeapon(new HeldWeapon(scene.rifle), supply);
+            Pickup.ForWeapon(new HeldWeapon(scene.rifle), supply, scene.grid.VoidHeight);
             BuildShop();
             BuildArena();
+            spawner.Begin(scene.spawn, scene.points, scene.grid, scene.player, scene.Eye);
         }
 
         private void BuildArena()
@@ -32,8 +43,8 @@ namespace ZombieYard
             scene.player.GetComponent<YardHud>().Boss = scene.Eye;
             foreach (int side in new[] { -1, 1 })
             {
-                Vector3 position = layout.Floor(-6, side * 3);
-                Pickup.ForMedkit(scene.player.config, true, position + Vector3.up * .35f);
+                Vector3 position = layout.MedkitPosition(side);
+                Pickup.ForMedkit(scene.player.config, true, position + Vector3.up * .35f, scene.grid.VoidHeight);
                 var light = new GameObject("Свет у аптечки").AddComponent<Light>();
                 light.transform.SetParent(grid.transform, false);
                 light.transform.position = position + Vector3.up * (2.8f * grid.Size);
@@ -50,7 +61,7 @@ namespace ZombieYard
             var grid = scene.grid;
             var room = new GameObject("Магазин под двором").transform;
             room.SetParent(grid.transform, false);
-            room.localPosition = new Vector3(0, grid.ShopFloorLevel, 1) * grid.Size;
+            room.localPosition = (Vector3)grid.Shop.Cell(0, 1) * grid.Size;
             room.localScale = Vector3.one * grid.Size;
             var lamp = new GameObject("Свет прилавков").AddComponent<Light>();
             lamp.transform.SetParent(room, false);
@@ -70,12 +81,8 @@ namespace ZombieYard
             void Ammo(int x, AmmoDeal deal)
             {
                 var pack = deal.pack;
-                Stand(x, $"{pack.ammo.title} ×{pack.count}", deal.terms, pack.ammo.pickupVisual, () =>
-                {
-                    if (pack.count <= 0 || player.Gear.Stock(pack.ammo) > int.MaxValue - pack.count) return false;
-                    player.Gear.Add(pack.ammo, pack.count);
-                    return true;
-                }, "Патроны недоступны");
+                Stand(x, $"{pack.ammo.title} ×{pack.count}", deal.terms, pack.ammo.pickupVisual,
+                    () => player.Gear.Add(pack.ammo, pack.count), "Патроны недоступны");
             }
 
             Ammo(-2, world.shells);
@@ -89,13 +96,12 @@ namespace ZombieYard
             Stand(2, staff.title, world.staff, staff.visual,
                 () => player.Gear.Take(new HeldWeapon(staff)), "Слоты заняты · G — бросить оружие");
             Physics.SyncTransforms();
-            foreach (Transform counter in room)
+            foreach (var counter in room.GetComponentsInChildren<ShopStand>())
             {
-                if (!counter.TryGetComponent<ShopStand>(out _)) continue;
                 var parts = counter.GetComponentsInChildren<BoxCollider>();
                 var bounds = parts[0].bounds;
                 foreach (var part in parts) bounds.Encapsulate(part.bounds);
-                grid.RegisterCounter(bounds);
+                grid.Routes.RegisterCounter(bounds);
             }
         }
     }

@@ -1,3 +1,7 @@
+// Ответственности
+// - Ведёт полёт снаряда, включая столкновения и рикошеты.
+// - Передаёт урон цели и завершает полёт по дальности, попаданию или времени жизни.
+
 using System;
 using UnityEngine;
 
@@ -9,12 +13,14 @@ namespace ZombieYard
         private AmmoConfig ammo;
         private LineRenderer trail;
         private Action onDamage;
+        private bool firedByPlayer;
         private Vector3 direction;
         private float travelled, impactAge, flightRemaining;
         private bool impacted;
 
-        public void Launch(AmmoConfig settings, Vector3 start, Vector3 heading, Action damageFeedback)
+        public void Launch(AmmoConfig settings, Vector3 start, Vector3 heading, Action damageFeedback, bool firedByPlayer = false)
         {
+            this.firedByPlayer = firedByPlayer;
             ammo = settings;
             onDamage = damageFeedback;
             flightRemaining = settings.ricochetSeconds;
@@ -86,9 +92,9 @@ namespace ZombieYard
 
         private void Damage(RaycastHit hit)
         {
-            var target = Health.AtHit(hit);
+            var target = YardChunk.ResolveHit(hit);
             if (!target || target.Current <= 0) return;
-            target.Damage(ammo.damage, byPlayer: true);
+            target.Damage(ammo.damage, byPlayer: firedByPlayer);
             onDamage?.Invoke();
         }
     }

@@ -1,3 +1,7 @@
+// Ответственности
+// - Строит меш и коллайдер открытых граней своего чанка.
+// - Сопоставляет попадание в треугольник с разрушаемой клеткой.
+
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -81,9 +85,12 @@ namespace ZombieYard
             triangles.Add(i); triangles.Add(i + 2); triangles.Add(i + 3);
         }
 
-        public Health TargetAt(RaycastHit hit)
+        public static Health ResolveHit(RaycastHit hit) =>
+            hit.collider.TryGetComponent<YardChunk>(out var chunk) ? chunk.TargetAt(hit) : hit.collider.GetComponentInParent<Health>();
+
+        private Health TargetAt(RaycastHit hit)
         {
-            return grid.HealthAt(faceCells[hit.triangleIndex / 2]);
+            return grid.GetOrCreateBlockHealth(faceCells[hit.triangleIndex / 2]);
         }
 
         private void OnDestroy() { if (mesh) Destroy(mesh); }

@@ -1,3 +1,6 @@
+// Ответственности
+// - Задаёт урон, дальность и радиус контакта атаки.
+
 using UnityEngine;
 
 namespace ZombieYard

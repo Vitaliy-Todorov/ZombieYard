@@ -1,3 +1,7 @@
+// Ответственности
+// - Проверяет доступность и устройство подземного магазина.
+// - Проверяет выдачу, списание очков и остаток товара при покупке и перезапуске.
+
 using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
@@ -53,7 +57,7 @@ namespace ZombieYard.Tests
             var grid = scene.grid;
             var body = Player.GetComponent<CharacterController>();
             body.enabled = false;
-            Player.transform.SetPositionAndRotation(new Vector3(x, grid.ShopFloorLevel, .5f) * grid.Size
+            Player.transform.SetPositionAndRotation(grid.transform.position + ((Vector3)grid.Shop.Cell(x, 0) + Vector3.forward * .5f) * grid.Size
                 + Vector3.up * .015f, Quaternion.identity);
             body.enabled = true;
             Physics.SyncTransforms();
@@ -75,21 +79,22 @@ namespace ZombieYard.Tests
         public IEnumerator DiggingUnderYardOpensFourBlockRoomOnBedrock()
         {
             var grid = scene.grid;
-            var column = new Vector2Int(0, -2);
+            var column = grid.Shop.Center + new Vector2Int(0, -2);
             Vector3 top = grid.Center(column);
             float size = grid.Size;
-            float floor = (YardGrid.YardLevel - 2 - scene.world.subsoilDepth) * size;
+            float floor = grid.transform.position.y + grid.ShopFloorLevel * size;
+            var fog = Object.FindAnyObjectByType<ExteriorFog>();
             var inside = new Vector3(top.x, floor + size, top.z);
-            Assert.IsFalse(Player.Fog.Contains(inside), "The sealed shop starts dry.");
+            Assert.IsFalse(fog.Contains(inside), "The sealed shop starts dry.");
             Assert.IsTrue(Physics.Raycast(inside, Vector3.up, out var roof));
             Assert.AreEqual(floor + 4 * size, roof.point.y, .01f);
             Assert.IsTrue(Physics.Raycast(inside, Vector3.down, out var baseHit));
             Assert.AreEqual(floor, baseHit.point.y, .01f);
-            Assert.IsNull(Health.AtHit(baseHit));
-            for (int i = 0; i < 2 + scene.world.subsoilDepth - 4; i++)
+            Assert.IsNull(YardChunk.ResolveHit(baseHit));
+            for (int i = 0; i < YardGrid.YardLevel - grid.ShopFloorLevel - ShopLayout.Height; i++)
             {
                 Assert.IsTrue(Physics.Raycast(top + Vector3.up, Vector3.down, out var hit));
-                var block = Health.AtHit(hit);
+                var block = YardChunk.ResolveHit(hit);
                 Assert.IsNotNull(block);
                 block.Damage(block.Current);
             }
@@ -99,8 +104,33 @@ namespace ZombieYard.Tests
             Assert.AreEqual(5, Object.FindObjectsByType<ShopStand>(FindObjectsSortMode.None).Length);
             yield return AtCounter(0);
             yield return new WaitForSeconds(scene.world.fogInterval + .1f);
-            Assert.IsFalse(Player.Fog.Exposed);
+            Assert.IsFalse(fog.Exposed);
             Assert.AreEqual(Player.Health.Maximum, Player.Health.Current);
+        }
+
+        [UnityTest]
+        public IEnumerator MovingShopMovesRoomAndSaleTogether()
+        {
+            var world = Object.Instantiate(scene.world);
+            var original = scene.grid.Shop.Center;
+            world.shopCenterX = original.x <= 0 ? 5 : -5;
+            world.shopCenterZ = original.y + 1;
+            try
+            {
+                yield return YardTestScene.Load(scope => { scene = scope; scene.world = world; });
+                var grid = scene.grid;
+                Assert.AreEqual(world.ShopCenter, grid.Shop.Center);
+                var oldCell = new Vector3Int(original.x, grid.ShopFloorLevel + 1, original.y);
+                Assert.IsNotNull(grid.GetOrCreateBlockHealth(oldCell), "Previous room must contain terrain.");
+                Assert.IsNull(grid.GetOrCreateBlockHealth(grid.Shop.Cell(0, 0) + Vector3Int.up));
+                yield return AtCounter(-2);
+                var deal = world.shells;
+                for (int i = 0; i < deal.terms.price; i++) Player.Score.RecordKill(ZombieKind.Normal);
+                int before = Player.Gear.Stock(deal.pack.ammo);
+                yield return PressBuy();
+                Assert.AreEqual(before + deal.pack.count, Player.Gear.Stock(deal.pack.ammo));
+            }
+            finally { Object.Destroy(world); }
         }
 
         [UnityTest]
@@ -147,10 +177,30 @@ namespace ZombieYard.Tests
         }
 
         [UnityTest]
+        public IEnumerator FullReserveLeavesBothPickupAndSaleUntouched()
+        {
+            var deal = scene.world.shells;
+            var gear = Player.Gear;
+            int space = int.MaxValue - gear.Stock(deal.pack.ammo);
+            if (space > 0) Assert.IsTrue(gear.Add(deal.pack.ammo, space));
+            var pickup = Pickup.ForAmmo(deal.pack.ammo, deal.pack.count, Player.transform.position, Player.VoidHeight);
+            Assert.IsFalse(pickup.Collect(gear));
+            Assert.IsTrue(pickup.gameObject.activeSelf);
+            yield return AtCounter(-2);
+            var stand = Player.AimedStand;
+            for (int i = 0; i < stand.Price; i++) Player.Score.RecordKill(ZombieKind.Normal);
+            int balance = Player.Score.Balance;
+            int stock = stand.Remaining;
+            yield return PressBuy();
+            Assert.AreEqual(int.MaxValue, gear.Stock(deal.pack.ammo));
+            Assert.AreEqual(balance, Player.Score.Balance);
+            Assert.AreEqual(stock, stand.Remaining);
+        }
+
+        [UnityTest]
         public IEnumerator MedkitsAndStaffChargeOnlyWhenReceived()
         {
             var world = scene.world;
-            Assert.AreEqual(100, world.staff.price);
             int funds = world.staff.price + world.partialMedkit.price + world.fullMedkit.price;
             for (int i = 0; i < funds; i++) Player.Score.RecordKill(ZombieKind.Normal);
             yield return AtCounter(0);

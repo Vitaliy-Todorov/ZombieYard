@@ -1,3 +1,7 @@
+// Ответственности
+// - Обновляет симуляцию тумана и отображает изменившиеся объёмы.
+// - Отслеживает контакт игрока с туманом и наносит периодический урон.
+
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -60,7 +64,7 @@ namespace ZombieYard
                         { name = "Fog levels", filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
                     var properties = new MaterialPropertyBlock();
                     properties.SetTexture("_FogCells", texture);
-                    properties.SetVector("_FogOrigin", volume.ChunkOrigin(id));
+                    properties.SetVector("_FogOrigin", grid.transform.position + volume.ChunkOrigin(id));
                     renderer.SetPropertyBlock(properties);
                     renderers.Add(id, renderer);
                     textures.Add(id, texture);
@@ -76,7 +80,7 @@ namespace ZombieYard
 
         private void LateUpdate()
         {
-            if (player.Paused || player.Health.Current == 0) return;
+            if (!player.Playing) return;
             flowTime += Time.deltaTime;
             while (flowTime >= flowInterval)
             {

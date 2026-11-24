@@ -1,3 +1,6 @@
+// Ответственности
+// - Создаёт текстурный атлас блоков и выбирает участок текстуры для каждой грани.
+
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -62,7 +65,15 @@ namespace ZombieYard
                 Voxel.Bedrock => (int)Tile.Bedrock,
                 Voxel.Pillar => (int)Tile.Brick,
                 Voxel.RoseStone or Voxel.RoseBedrock => (int)Tile.Rose,
-                _ => (int)kind - 1
+                Voxel.Turf => (int)Tile.Turf,
+                Voxel.Earth => (int)Tile.Earth,
+                Voxel.Wood => (int)Tile.Wood,
+                Voxel.Brick => (int)Tile.Brick,
+                Voxel.Crate => (int)Tile.Crate,
+                Voxel.Bark => (int)Tile.Bark,
+                Voxel.Leaves => (int)Tile.Leaves,
+                Voxel.Metal => (int)Tile.Metal,
+                _ => throw new System.ArgumentOutOfRangeException(nameof(kind))
             };
             if (kind == Voxel.Turf && normalY <= 0) tile = normalY == 0 ? (int)Tile.TurfSide : (int)Tile.Earth;
             if (kind == Voxel.Bark && normalY != 0) tile = (int)Tile.EndGrain;

@@ -1,3 +1,7 @@
+// Ответственности
+// - Inventory хранит слоты, выбранное оружие и запас патронов, ведёт перезарядку.
+// - HeldWeapon хранит содержимое магазина и время следующего применения конкретного оружия.
+
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -12,6 +16,7 @@ namespace ZombieYard
         public float NextUse;
         public HeldWeapon(WeaponConfig config)
         {
+            config.ValidateLoadout();
             Config = config;
             if (!config.UsesAmmo) return;
             Ammo = config.compatibleAmmo[0];
@@ -53,9 +58,13 @@ namespace ZombieYard
         }
 
         public int Stock(AmmoConfig ammo) => ammo && reserve.TryGetValue(ammo, out int count) ? count : 0;
-        public void Add(AmmoConfig ammo, int count)
+        public bool Add(AmmoConfig ammo, int count)
         {
-            if (ammo && count > 0) reserve[ammo] = Stock(ammo) + count;
+            if (!ammo || count <= 0) return false;
+            int current = Stock(ammo);
+            if (count > int.MaxValue - current) return false;
+            reserve[ammo] = current + count;
+            return true;
         }
 
         public bool Take(HeldWeapon weapon)

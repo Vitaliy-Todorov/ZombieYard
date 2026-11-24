@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Ответственности
+// - Хранит текст, иллюстрацию и ссылки стартовой памятки Unity.
+
+using System;
 using UnityEngine;
 
 public class Readme : ScriptableObject

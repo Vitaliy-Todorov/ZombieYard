@@ -1,3 +1,7 @@
+// Ответственности
+// - Проверяет стартовую выкладку оружия, рикошеты посоха и контакт пилы.
+// - Проверяет подбор аптечек и применение настройки лечения в новой попытке.
+
 using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
@@ -11,6 +15,7 @@ namespace ZombieYard.Tests
     public sealed class EquipmentTests
     {
         private GameLifetimeScope scene;
+        private WeaponConfig Chainsaw => System.Array.Find(scene.spawn.zombie.loot, entry => entry.weapon).weapon;
         private YardPlayer Player => scene.player;
 
         [UnitySetUp]
@@ -29,13 +34,13 @@ namespace ZombieYard.Tests
                 && p.transform.position.y >= YardGrid.YardLevel * scene.grid.Size - .1f);
             var titles = System.Array.ConvertAll(yard, p => p.Title);
             CollectionAssert.Contains(titles, scene.rifle.title);
-            foreach (var absent in new[] { scene.staff.title, scene.chainsaw.title, "Малая аптечка", "Полная аптечка" })
+            foreach (var absent in new[] { scene.staff.title, Chainsaw.title, "Малая аптечка", "Полная аптечка" })
                 CollectionAssert.DoesNotContain(titles, absent);
         }
 
         private void Equip(WeaponConfig config)
         {
-            var pickup = Pickup.ForWeapon(new HeldWeapon(config), Player.transform.position);
+            var pickup = Pickup.ForWeapon(new HeldWeapon(config), Player.transform.position, Player.VoidHeight);
             Assert.IsFalse(pickup.Collect(Player.Gear));
             Player.Gear.Drop();
             Assert.IsTrue(pickup.Collect(Player.Gear));
@@ -57,6 +62,7 @@ namespace ZombieYard.Tests
         {
             Equip(scene.staff);
             var bolt = scene.staff.staffBolt;
+            float ready = Time.time + scene.staff.delay;
             Player.Attack();
             Player.Attack();
             var shots = Object.FindObjectsByType<ShotProjectile>(FindObjectsSortMode.None);
@@ -73,6 +79,7 @@ namespace ZombieYard.Tests
             Assert.LessOrEqual(back.Current, back.Maximum - bolt.damage);
             yield return new WaitForSeconds(bolt.ricochetSeconds * .45f + .08f);
             Assert.IsFalse(shots[0]);
+            while (Time.time < ready) yield return null;
             Player.Attack();
             Assert.IsNotNull(Object.FindAnyObjectByType<ShotProjectile>());
         }
@@ -89,7 +96,7 @@ namespace ZombieYard.Tests
                 var floor = scene.grid.Center(new Vector2Int(3, -2));
                 var start = floor + Vector3.up * .45f;
                 Assert.IsTrue(Physics.Raycast(start, Vector3.down, out var hit, 1));
-                var block = Health.AtHit(hit);
+                var block = YardChunk.ResolveHit(hit);
                 Assert.IsNotNull(block);
                 int before = block.Current;
                 var ceiling = Target(floor + Vector3.up * 2, new Vector3(1, .2f, 1));
@@ -107,8 +114,8 @@ namespace ZombieYard.Tests
         [UnityTest]
         public IEnumerator SawTicksOncePerTargetAndStopsOnReleaseOrLostContact()
         {
-            Equip(scene.chainsaw);
-            var blade = scene.chainsaw.melee;
+            Equip(Chainsaw);
+            var blade = Chainsaw.melee;
             var view = Player.eyes.transform;
             var target = new GameObject("Compound saw target");
             var hp = target.AddComponent<Health>();
@@ -138,20 +145,20 @@ namespace ZombieYard.Tests
                 yield return null;
                 InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Left));
                 int expectedHealth = hp.Maximum - 3 * blade.damage;
-                float deadline = Time.time + Mathf.Max(2f, scene.chainsaw.delay * 3.5f);
+                float deadline = Time.time + Mathf.Max(2f, Chainsaw.delay * 3.5f);
                 while (hp.Current > expectedHealth && Time.time < deadline)
                     yield return null;
                 Assert.LessOrEqual(hp.Current, expectedHealth);
                 target.transform.position += view.right * 3;
                 Physics.SyncTransforms();
                 int outOfReach = hp.Current;
-                yield return new WaitForSeconds(scene.chainsaw.delay * 2);
+                yield return new WaitForSeconds(Chainsaw.delay * 2);
                 Assert.AreEqual(outOfReach, hp.Current);
                 InputSystem.QueueStateEvent(mouse, new MouseState());
                 yield return null;
                 target.transform.position -= view.right * 3;
                 Physics.SyncTransforms();
-                yield return new WaitForSeconds(scene.chainsaw.delay * 2);
+                yield return new WaitForSeconds(Chainsaw.delay * 2);
                 Assert.AreEqual(outOfReach, hp.Current);
             }
             finally
@@ -176,7 +183,7 @@ namespace ZombieYard.Tests
         public IEnumerator MedkitsStayAtFullHealthAndRestoreConfiguredAmountsOnApproach()
         {
             var hp = Player.Health;
-            var small = Pickup.ForMedkit(Player.config, false, Player.transform.position);
+            var small = Pickup.ForMedkit(Player.config, false, Player.transform.position, Player.VoidHeight);
             PutWithinReach(small);
             yield return null;
             Assert.IsTrue(small && small.gameObject.activeSelf);
@@ -184,7 +191,7 @@ namespace ZombieYard.Tests
             yield return null;
             Assert.AreEqual(1 + Player.config.partialHealing, hp.Current);
             Assert.IsFalse(small && small.gameObject.activeSelf);
-            var full = Pickup.ForMedkit(Player.config, true, Player.transform.position);
+            var full = Pickup.ForMedkit(Player.config, true, Player.transform.position, Player.VoidHeight);
             PutWithinReach(full);
             yield return null;
             Assert.AreEqual(hp.Maximum, hp.Current);
@@ -203,10 +210,10 @@ namespace ZombieYard.Tests
                 var hp = Player.Health;
                 Assert.AreEqual(hp.Maximum, hp.Current);
                 hp.Damage(20);
-                PutWithinReach(Pickup.ForMedkit(Player.config, false, Player.transform.position));
+                PutWithinReach(Pickup.ForMedkit(Player.config, false, Player.transform.position, Player.VoidHeight));
                 yield return null;
                 Assert.AreEqual(hp.Maximum - 13, hp.Current);
-                var extra = Pickup.ForMedkit(config, false, Player.transform.position);
+                var extra = Pickup.ForMedkit(config, false, Player.transform.position, Player.VoidHeight);
                 hp.Heal(10);
                 PutWithinReach(extra);
                 yield return null;

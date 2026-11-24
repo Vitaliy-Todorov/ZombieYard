@@ -1,3 +1,7 @@
+// Ответственности
+// - Задаёт параметры участка, материалов и тумана.
+// - Хранит условия торговли и начальные настройки босса и укрытий арены.
+
 using UnityEngine;
 
 namespace ZombieYard
@@ -33,6 +37,11 @@ namespace ZombieYard
         [Min(.25f)] public float blockSize = 1.25f;
         public BlockConfig soil, fence, masonry, supplyCrate;
         [Header("Underground shop")]
+        [Tooltip("Center cell of the shop along the world X axis.")]
+        public int shopCenterX;
+        [Tooltip("Center cell of the shop along the world Z axis.")]
+        public int shopCenterZ;
+        public Vector2Int ShopCenter => new(shopCenterX, shopCenterZ);
         public GameObject shopCounter;
         public AmmoDeal shells, rifleRounds;
         public ShopTerms partialMedkit, fullMedkit, staff;

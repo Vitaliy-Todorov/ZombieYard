@@ -1,3 +1,7 @@
+// Ответственности
+// - Задаёт способ атаки, задержку применения и модель оружия.
+// - Описывает совместимые патроны, ёмкость магазина и длительность перезарядки.
+
 using UnityEngine;
 
 namespace ZombieYard
@@ -14,6 +18,15 @@ namespace ZombieYard
         [Min(0)] public int capacity;
         [Min(.05f)] public float reloadSeconds = 1.3f;
         public GameObject visual;
+        internal void ValidateLoadout()
+        {
+            if (melee && staffBolt)
+                throw new System.InvalidOperationException($"{name}: select one attack type.");
+            if (UsesAmmo && (capacity <= 0 || compatibleAmmo == null || compatibleAmmo.Length == 0 ||
+                             System.Array.Exists(compatibleAmmo, ammo => !ammo)))
+                throw new System.InvalidOperationException($"{name}: a firearm needs capacity and compatible ammunition.");
+        }
+
         public bool UsesAmmo => melee == null && staffBolt == null;
     }
 }

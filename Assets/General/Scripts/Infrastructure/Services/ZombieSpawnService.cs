@@ -1,53 +1,61 @@
+// Ответственности
+// - Создаёт порталы и планирует появление зомби на поверхности, под землёй и на арене.
+// - Ведёт лимиты живых врагов, освобождает место и передаёт убийство в счёт попытки.
+
 using System.Collections.Generic;
 using UnityEngine;
 using VContainer.Unity;
 
 namespace ZombieYard
 {
-    public sealed class ZombieSpawnService : IStartable, ITickable, System.IDisposable
+    public sealed class ZombieSpawnService : ITickable, System.IDisposable
     {
-        private readonly GameLifetimeScope scene;
+        private ZombieSpawnerConfig settings;
+        private YardGrid grid;
+        private YardPlayer player;
+        private ArenaEye eye;
         private readonly HashSet<ZombieAgent> living = new();
         private readonly List<ZombiePortal> surface = new();
         private readonly List<ZombiePortal> underground = new();
         private readonly List<ZombiePortal> arena = new();
         private readonly HashSet<ZombieAgent> arenaLiving = new();
-        private readonly CapsuleCollider body;
+        private CapsuleCollider body;
         private float remaining, undergroundRemaining, arenaRemaining;
-        private int undergroundAlive;
+        private readonly HashSet<ZombieAgent> undergroundLiving = new();
+        private bool arenaActive;
         public int Alive => living.Count;
-
-        public ZombieSpawnService(GameLifetimeScope scene)
-        {
-            this.scene = scene;
-            body = scene.spawn.prefab.GetComponent<CapsuleCollider>();
-            remaining = Interval(scene.spawn.minInterval, scene.spawn.maxInterval);
-        }
 
         private static float Interval(float min, float max) => Random.Range(min, Mathf.Max(min, max));
 
-        public void Start()
+        internal void Begin(ZombieSpawnerConfig settings, Transform[] points, YardGrid grid, YardPlayer player, ArenaEye eye)
         {
-            scene.Eye.EncounterStarted += OpenArena;
-            scene.Eye.Health.Died += CloseArena;
-            arenaRemaining = scene.spawn.arenaInterval;
-            foreach (var point in scene.points)
+            this.settings = settings;
+            this.grid = grid;
+            this.player = player;
+            this.eye = eye;
+            body = settings.prefab.GetComponent<CapsuleCollider>();
+            remaining = Interval(settings.minInterval, settings.maxInterval);
+            eye.EncounterStarted += OpenArena;
+            eye.Health.Died += CloseArena;
+            arenaRemaining = settings.arenaInterval;
+            foreach (var point in points)
             {
                 var feet = point.position;
-                feet.y = scene.grid.Height(scene.grid.Cell(feet));
+                feet.y = grid.Height(grid.Cell(feet));
                 if (!float.IsNegativeInfinity(feet.y))
-                    surface.Add(ZombiePortal.Create(point, feet, scene.spawn.portalMaterial, false));
+                    surface.Add(ZombiePortal.Create(point, feet, settings.portalMaterial, false));
             }
-            scene.grid.StoneMined += OpenPortal;
-            scene.grid.BlockRemoved += UpdateSurfacePortals;
+            grid.StoneMined += OpenPortal;
+            grid.BlockRemoved += UpdateSurfacePortals;
         }
 
         private void OpenArena()
         {
-            var layout = scene.grid.Arena;
-            foreach (var feet in new[] { layout.Floor(1, -6), layout.Floor(1, 6), layout.Floor(7, 0) })
+            arenaActive = true;
+            var layout = grid.Arena;
+            foreach (var feet in layout.PortalPositions())
             {
-                var portal = ZombiePortal.Create(scene.grid.transform, feet, scene.spawn.portalMaterial, false);
+                var portal = ZombiePortal.Create(grid.transform, feet, settings.portalMaterial, false);
                 portal.name = "Портал арены";
                 arena.Add(portal);
             }
@@ -60,15 +68,12 @@ namespace ZombieYard
 
         private void OpenPortal(Vector3Int mined)
         {
-            var settings = scene.spawn;
-            if (scene.player.Health.Current == 0 || settings.portalChance <= 0 || Random.value > settings.portalChance) return;
-            var grid = scene.grid;
-            if (!grid.TryGround((Vector3)mined * grid.Size, out var floor)) return;
-            int height = Mathf.CeilToInt(body.height / grid.Size);
-            int radius = Mathf.Max(0, Mathf.CeilToInt(body.radius / grid.Size - .5f));
+            if (player.Health.Current == 0 || settings.portalChance <= 0 || Random.value > settings.portalChance) return;
+            if (!grid.Routes.TryGround(grid.WorldFeet(mined), out var floor)) return;
+            var (height, radius) = WalkerRoutes.BodyCells(body, grid.Size);
             // The mined voxel must be part of the opening, including when the headroom was dug last.
             if (mined.y >= floor.y + height || !grid.Routes.Clear(floor, floor.y + height, radius)) return;
-            Vector3 feet = (Vector3)floor * grid.Size;
+            Vector3 feet = grid.WorldFeet(floor);
             foreach (var portal in underground)
             {
                 float distance = Vector3.Distance(feet, portal.transform.position);
@@ -81,7 +86,6 @@ namespace ZombieYard
 
         private void UpdateSurfacePortals(Vector3Int removed)
         {
-            var grid = scene.grid;
             var column = new Vector2Int(removed.x, removed.z);
             foreach (var portal in surface)
             {
@@ -94,9 +98,8 @@ namespace ZombieYard
 
         public void Tick()
         {
-            if (!scene.player.Health || scene.player.Health.Current == 0 || scene.player.Paused) return;
-            var settings = scene.spawn;
-            if (arena.Count > 0)
+            if (!player || !player.Playing) return;
+            if (arenaActive)
             {
                 arenaRemaining -= Time.deltaTime;
                 if (arenaRemaining <= 0)
@@ -116,42 +119,45 @@ namespace ZombieYard
                 if (undergroundRemaining <= 0)
                 {
                     undergroundRemaining = Interval(settings.undergroundMinInterval, settings.undergroundMaxInterval);
-                    if (Alive < settings.limit && undergroundAlive < settings.undergroundLimit) SpawnUnderground();
+                    if (Alive < settings.limit && undergroundLiving.Count < settings.undergroundLimit) SpawnUnderground();
                 }
             }
             remaining -= Time.deltaTime;
             if (remaining > 0) return;
             remaining = Interval(settings.minInterval, settings.maxInterval);
-            if (Alive >= scene.spawn.limit || scene.points.Length == 0) return;
-            var point = scene.points[Random.Range(0, scene.points.Length)];
-            Vector3 position = point.position;
-            float height = scene.grid.Height(scene.grid.Cell(position));
-            if (float.IsNegativeInfinity(height)) return;
-            position.y = height;
-            Spawn(position, point.rotation, ZombieKind.Normal);
+            if (Alive >= settings.limit || surface.Count == 0) return;
+            int start = Random.Range(0, surface.Count);
+            for (int i = 0; i < surface.Count; i++)
+            {
+                var portal = surface[(start + i) % surface.Count];
+                if (!portal.isActiveAndEnabled) continue;
+                Spawn(portal.transform.position, portal.transform.rotation, ZombieKind.Normal);
+                break;
+            }
         }
 
         private void SpawnUnderground()
         {
             var exit = FreeExit(underground);
             if (!exit) return;
-            float chance = scene.spawn.purpleChance;
+            float chance = settings.purpleChance;
             var kind = chance > 0 && Random.value <= chance ? ZombieKind.Purple : ZombieKind.Red;
-            Spawn(exit.position, exit.rotation, kind);
-            undergroundAlive++;
+            undergroundLiving.Add(Spawn(exit.position, exit.rotation, kind));
         }
 
         private Transform FreeExit(List<ZombiePortal> portals)
         {
+            var (height, radius) = WalkerRoutes.BodySize(body);
+            var offset = Vector3.Scale(body.center, body.transform.lossyScale);
+            var halfSegment = Vector3.up * (height / 2 - radius);
             int start = Random.Range(0, portals.Count);
             for (int i = 0; i < portals.Count; i++)
             {
                 var portal = portals[(start + i) % portals.Count].transform;
                 var feet = portal.position;
                 // Leave a small skin above the supporting mesh. Occupied exits retry next interval.
-                var bottom = feet + body.center - Vector3.up * (body.height / 2 - body.radius);
-                var top = feet + body.center + Vector3.up * (body.height / 2 - body.radius);
-                if (Physics.CheckCapsule(bottom, top, body.radius - .005f,
+                var center = feet + portal.rotation * offset;
+                if (Physics.CheckCapsule(center - halfSegment, center + halfSegment, Mathf.Max(.001f, radius - .005f),
                     Physics.AllLayers, QueryTriggerInteraction.Ignore)) continue;
                 return portal;
             }
@@ -160,9 +166,9 @@ namespace ZombieYard
 
         private ZombieAgent Spawn(Vector3 position, Quaternion rotation, ZombieKind kind)
         {
-            var zombie = Object.Instantiate(scene.spawn.prefab, position, rotation);
+            var zombie = Object.Instantiate(settings.prefab, position, rotation);
             living.Add(zombie);
-            zombie.Initialize(scene.spawn.zombie, scene.grid, scene.player, OnDeath, kind);
+            zombie.Initialize(settings.zombie, grid, player, OnDeath, kind);
             return zombie;
         }
 
@@ -170,22 +176,24 @@ namespace ZombieYard
         {
             if (!living.Remove(zombie)) return;
             arenaLiving.Remove(zombie);
-            if (zombie.Kind != ZombieKind.Normal) undergroundAlive--;
-            if (scene.player.Health.Current > 0) scene.player.Score.RecordKill(zombie.Kind);
+            undergroundLiving.Remove(zombie);
+            if (player.Health.Current > 0) player.Score.RecordKill(zombie.Kind);
         }
 
         public void Dispose()
         {
-            if (scene.Eye)
+            if (eye)
             {
-                scene.Eye.EncounterStarted -= OpenArena;
-                scene.Eye.Health.Died -= CloseArena;
+                eye.EncounterStarted -= OpenArena;
+                eye.Health.Died -= CloseArena;
             }
-            scene.grid.StoneMined -= OpenPortal;
-            scene.grid.BlockRemoved -= UpdateSurfacePortals;
+            if (!grid) return;
+            grid.StoneMined -= OpenPortal;
+            grid.BlockRemoved -= UpdateSurfacePortals;
             foreach (var portal in surface) if (portal) Object.Destroy(portal.gameObject);
             foreach (var portal in underground) if (portal) Object.Destroy(portal.gameObject);
             foreach (var portal in arena) if (portal) Object.Destroy(portal.gameObject);
+            undergroundLiving.Clear();
             arenaLiving.Clear();
             living.Clear();
         }

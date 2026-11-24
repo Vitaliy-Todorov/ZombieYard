@@ -1,3 +1,7 @@
+// Ответственности
+// - Проверяет условия открытия подземных порталов и общий лимит с поверхностью.
+// - Проверяет погоню, добычу и награды подземных видов зомби.
+
 using System;
 using System.Collections;
 using System.Linq;
@@ -16,24 +20,26 @@ namespace ZombieYard.Tests
         private ZombieConfig walker;
         private float oldScale;
         private YardGrid Grid => scene.grid;
+        private WeaponConfig Chainsaw => System.Array.Find(scene.spawn.zombie.loot, entry => entry.weapon).weapon;
         private YardPlayer Player => scene.player;
-        private ZombiePortal[] Underground => Grid.GetComponentsInChildren<ZombiePortal>();
+        private ZombiePortal[] Underground => Grid.GetComponentsInChildren<ZombiePortal>().Where(p => p.IsUnderground).ToArray();
         private int TunnelLevel => YardGrid.YardLevel - scene.world.plateauHeight - 5;
 
         [UnitySetUp]
         public IEnumerator LoadYard()
         {
             oldScale = Time.timeScale;
-            yield return SceneManager.LoadSceneAsync("Yard");
-            yield return null;
-            scene = Object.FindAnyObjectByType<GameLifetimeScope>();
-            spawn = Object.Instantiate(scene.spawn);
-            walker = Object.Instantiate(spawn.zombie);
-            scene.spawn = spawn;
-            spawn.zombie = walker;
-            spawn.portalChance = 1;
-            spawn.undergroundMinInterval = spawn.undergroundMaxInterval = .4f;
-            spawn.undergroundLimit = 1;
+            yield return YardTestScene.Load(scope =>
+            {
+                scene = scope;
+                spawn = Object.Instantiate(scene.spawn);
+                walker = Object.Instantiate(spawn.zombie);
+                scene.spawn = spawn;
+                spawn.zombie = walker;
+                spawn.portalChance = 1;
+                spawn.undergroundMinInterval = spawn.undergroundMaxInterval = .4f;
+                spawn.undergroundLimit = 1;
+            });
         }
 
         [TearDown]
@@ -46,7 +52,7 @@ namespace ZombieYard.Tests
 
         private void Dig(Vector3Int cell, bool playerHit = true)
         {
-            var block = Grid.HealthAt(cell);
+            var block = Grid.GetOrCreateBlockHealth(cell);
             Assert.IsNotNull(block, $"Expected a block at {cell}");
             block.Damage(block.Current, byPlayer: playerHit);
         }
@@ -71,7 +77,7 @@ namespace ZombieYard.Tests
                 Assert.IsNotNull(surface.GetComponentInChildren<Light>());
                 Assert.AreSame(spawn.portalMaterial, surface.GetComponentInChildren<LineRenderer>().sharedMaterial);
             }
-            scene.points = Array.Empty<Transform>();
+            foreach (var point in scene.points) point.gameObject.SetActive(false);
             var feet = new Vector3Int(0, TunnelLevel, 4);
             Dig(new Vector3Int(0, YardGrid.YardLevel - 1, 4));
             Dig(new Vector3Int(0, YardGrid.YardLevel - 2, 4));
@@ -84,7 +90,7 @@ namespace ZombieYard.Tests
             MovePlayer((Vector3)(feet + Vector3Int.left) * Grid.Size);
             Player.transform.rotation = Quaternion.LookRotation(Vector3.right);
             Player.eyes.transform.localRotation = Quaternion.identity;
-            var ceiling = Grid.HealthAt(feet + Vector3Int.up);
+            var ceiling = Grid.GetOrCreateBlockHealth(feet + Vector3Int.up);
             ceiling.Damage(ceiling.Maximum - Player.Gear.Active.Config.melee.damage);
             Physics.SyncTransforms();
             Player.Attack();
@@ -121,7 +127,7 @@ namespace ZombieYard.Tests
             while (!(normal = Object.FindAnyObjectByType<ZombieAgent>()) && Time.time < until) yield return null;
             Assert.IsNotNull(normal);
             Assert.AreEqual(ZombieKind.Normal, normal.Kind);
-            scene.points = Array.Empty<Transform>();
+            foreach (var point in scene.points) point.gameObject.SetActive(false);
             foreach (int x in new[] { -4, 4 })
             {
                 var feet = new Vector3Int(x, TunnelLevel, 3);
@@ -145,7 +151,7 @@ namespace ZombieYard.Tests
         [UnityTest]
         public IEnumerator UndergroundVariantsPursueDropLootAndAwardPoints()
         {
-            scene.points = Array.Empty<Transform>();
+            foreach (var point in scene.points) point.gameObject.SetActive(false);
             Time.timeScale = 2;
             walker.speed = 4;
             // Guarantee the configured drops for this attempt.
@@ -187,7 +193,7 @@ namespace ZombieYard.Tests
                         "The replacement drops from the suspended portal to the new floor.");
                 }
                 Assert.Greater(Grid.Height(Grid.Cell(zombie.transform.position)), zombie.transform.position.y + Grid.Size * 2);
-                int strength = kind == ZombieKind.Red ? 2 : 3;
+                int strength = kind == ZombieKind.Red ? walker.redStrength : walker.purpleStrength;
                 Assert.AreEqual(walker.hp * strength, zombie.Health.Current);
                 var skin = zombie.GetComponentsInChildren<Renderer>().Single(part => part.name == "Head");
                 var palette = new MaterialPropertyBlock();
@@ -211,10 +217,10 @@ namespace ZombieYard.Tests
                 var drops = Object.FindObjectsByType<Pickup>(FindObjectsSortMode.None)
                     .Where(item => Vector3.Distance(item.transform.position, zombie.transform.position) < 1).ToArray();
                 Assert.AreEqual(2, drops.Count(item => item.IsAmmo));
-                var saw = drops.Single(item => item.Title == scene.chainsaw.title);
+                var saw = drops.Single(item => item.Title == Chainsaw.title);
                 Player.Gear.Drop();
                 Assert.IsTrue(saw.Collect(Player.Gear));
-                Assert.AreSame(scene.chainsaw, Player.Gear.Active.Config);
+                Assert.AreSame(Chainsaw, Player.Gear.Active.Config);
                 var medkits = drops.Where(item => item.Title == "Малая аптечка").ToArray();
                 Assert.AreEqual(kind == ZombieKind.Purple ? 1 : 0, medkits.Length);
                 if (medkits.Length > 0)

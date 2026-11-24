@@ -1,3 +1,7 @@
+// Ответственности
+// - Размещает предмет в мире и обрабатывает бросок оружия.
+// - Передаёт оружие или патроны в инвентарь либо применяет аптечку.
+
 using UnityEngine;
 
 namespace ZombieYard
@@ -17,17 +21,17 @@ namespace ZombieYard
         {
             if (transform.position.y < voidHeight) Destroy(gameObject);
         }
-        public static Pickup ForWeapon(HeldWeapon weapon, Vector3 position)
+        public static Pickup ForWeapon(HeldWeapon weapon, Vector3 position, float voidHeight)
         {
-            var pickup = Create(weapon.Config.visual, position, true);
+            var pickup = Create(weapon.Config.visual, position, true, voidHeight);
             pickup.weapon = weapon;
             return pickup;
         }
 
-        public static bool TryThrow(HeldWeapon weapon, CharacterController holder, Vector3 forward)
+        public static bool TryThrow(HeldWeapon weapon, CharacterController holder, Vector3 forward, float voidHeight)
         {
             Vector3 chest = holder.transform.TransformPoint(holder.center);
-            var pickup = ForWeapon(weapon, chest);
+            var pickup = ForWeapon(weapon, chest, voidHeight);
             var box = pickup.GetComponent<BoxCollider>();
             box.enabled = false;
             Vector3 half = box.size * .5f;
@@ -49,23 +53,23 @@ namespace ZombieYard
             return true;
         }
 
-        public static Pickup ForAmmo(AmmoConfig ammo, int count, Vector3 position)
+        public static Pickup ForAmmo(AmmoConfig ammo, int count, Vector3 position, float voidHeight)
         {
-            var pickup = Create(ammo.pickupVisual, position, false);
+            var pickup = Create(ammo.pickupVisual, position, false, voidHeight);
             pickup.ammo = ammo;
             pickup.count = count;
             return pickup;
         }
 
-        public static Pickup ForMedkit(PlayerConfig config, bool full, Vector3 position)
+        public static Pickup ForMedkit(PlayerConfig config, bool full, Vector3 position, float voidHeight)
         {
-            var pickup = Create(full ? config.fullMedkitVisual : config.partialMedkitVisual, position, false);
+            var pickup = Create(full ? config.fullMedkitVisual : config.partialMedkitVisual, position, false, voidHeight);
             pickup.healing = full ? int.MaxValue : Mathf.Max(1, config.partialHealing);
             pickup.name = pickup.Title;
             return pickup;
         }
 
-        private static Pickup Create(GameObject visual, Vector3 position, bool isWeapon)
+        private static Pickup Create(GameObject visual, Vector3 position, bool isWeapon, float voidHeight)
         {
             var root = new GameObject(isWeapon ? "Weapon pickup" : "Ammo pickup");
             root.transform.position = position;
@@ -78,8 +82,7 @@ namespace ZombieYard
             box.size = Vector3.Max(bounds.size, Vector3.one * .12f);
             root.AddComponent<Rigidbody>().collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             var pickup = root.AddComponent<Pickup>();
-            var grid = FindAnyObjectByType<YardGrid>();
-            pickup.voidHeight = grid ? grid.VoidHeight : -12;
+            pickup.voidHeight = voidHeight;
             return pickup;
         }
 
@@ -88,7 +91,7 @@ namespace ZombieYard
             if (!gameObject.activeSelf) return false;
             if (weapon != null && !inventory.Take(weapon)) return false;
             if (healing > 0 && (!recipient || !recipient.Heal(healing))) return false;
-            if (IsAmmo) inventory.Add(ammo, count);
+            if (IsAmmo && !inventory.Add(ammo, count)) return false;
             gameObject.SetActive(false);
             Destroy(gameObject);
             return true;

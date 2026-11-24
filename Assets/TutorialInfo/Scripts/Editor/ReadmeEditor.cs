@@ -1,4 +1,8 @@
-﻿using System.Collections;
+﻿// Ответственности
+// - Открывает стартовую памятку Unity и отображает её разделы в инспекторе.
+// - Управляет загрузкой раскладки редактора и удалением материалов памятки.
+
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;

@@ -1,3 +1,6 @@
+// Ответственности
+// - Хранит HP одной цели, применяет урон и лечение, сообщает о ранении и смерти.
+
 using System;
 using UnityEngine;
 
@@ -10,9 +13,6 @@ namespace ZombieYard
         public bool KilledByPlayer { get; private set; }
         public event Action Died;
         public event Action Hurt;
-
-        public static Health AtHit(RaycastHit hit) =>
-            hit.collider.TryGetComponent<YardChunk>(out var chunk) ? chunk.TargetAt(hit) : hit.collider.GetComponentInParent<Health>();
 
         public void Initialize(int maximum) => Current = Maximum = Mathf.Max(1, maximum);
 

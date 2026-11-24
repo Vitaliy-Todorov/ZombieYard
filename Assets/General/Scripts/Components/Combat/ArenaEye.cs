@@ -1,3 +1,7 @@
+// Ответственности
+// - Ведёт фазы боя с глазом от входа игрока на арену до победы.
+// - Наводит и показывает лазер, наносит урон первой цели на его пути.
+
 using System;
 using UnityEngine;
 
@@ -28,7 +32,7 @@ namespace ZombieYard
             layout = grid.Arena;
             aimOffset = player.GetComponent<CharacterController>().center;
             radius = grid.Size * 1.25f;
-            transform.position = layout.Floor(0, 0) + Vector3.up * (3.2f * grid.Size);
+            transform.position = layout.EyePosition;
             transform.localScale = Vector3.one * radius;
             Health = GetComponent<Health>();
             Health.Initialize(settings.hp);
@@ -114,7 +118,7 @@ namespace ZombieYard
             glow.intensity = 2 + charge * 5;
             if (!firing || Time.time < nextHit) return;
             nextHit = Time.time + settings.tickSeconds;
-            if (contact) Health.AtHit(hit)?.Damage(settings.laser.damage);
+            if (contact) YardChunk.ResolveHit(hit)?.Damage(settings.laser.damage);
         }
 
         private void Defeat()

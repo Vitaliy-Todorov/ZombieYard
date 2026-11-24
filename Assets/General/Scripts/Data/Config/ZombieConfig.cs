@@ -1,3 +1,7 @@
+// Ответственности
+// - Задаёт здоровье, движение, оружие и особенности видов ходоков.
+// - Описывает условия, вероятность и состав добычи.
+
 using UnityEngine;
 
 namespace ZombieYard
@@ -11,6 +15,12 @@ namespace ZombieYard
         public bool partialMedkit;
         [Range(0, 1)] public float chance;
         public Vector2Int quantity;
+
+        internal void Validate(string owner)
+        {
+            if ((ammo ? 1 : 0) + (weapon ? 1 : 0) + (partialMedkit ? 1 : 0) != 1)
+                throw new System.InvalidOperationException($"{owner}: a loot entry must grant exactly one item.");
+        }
     }
 
     [CreateAssetMenu(menuName = "Zombie Yard/Zombie")]

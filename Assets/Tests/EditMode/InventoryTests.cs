@@ -1,5 +1,8 @@
+// Ответственности
+// - Проверяет приём патронов, расход запаса при перезарядке и отмену при смене слота.
+// - Проверяет предел лечения и однократное событие смерти.
+
 using NUnit.Framework;
-using UnityEditor;
 using UnityEngine;
 
 namespace ZombieYard.Tests
@@ -9,27 +12,46 @@ namespace ZombieYard.Tests
         [Test]
         public void ReloadConsumesReserveOnlyOnCompletionAndSwitchCancels()
         {
-            var config = AssetDatabase.LoadAssetAtPath<PlayerConfig>("Assets/General/Configs/Player/Survivor.asset");
-            var inventory = new Inventory(config);
-            inventory.Select(1);
-            var shotgun = inventory.Active;
-            var ammo = shotgun.Ammo;
-            int initial = inventory.Stock(ammo);
-            shotgun.Fire();
-            inventory.StartReload(0);
-            Assert.AreEqual(2, inventory.Slots.Length);
-            inventory.Select(0);
-            inventory.Tick(10);
-            Assert.AreSame(config.startingWeapons[0], inventory.Active.Config);
-            Assert.AreEqual(initial, inventory.Stock(ammo));
-            Assert.AreEqual(2, shotgun.Loaded);
-            inventory.Select(1);
-            inventory.StartReload(11);
-            inventory.Tick(11 + shotgun.Config.reloadSeconds);
-            Assert.AreEqual(3, shotgun.Loaded);
-            Assert.AreEqual(initial - 1, inventory.Stock(ammo));
-            Assert.AreSame(shotgun, inventory.Drop());
-            Assert.AreSame(config.fists, inventory.Active.Config);
+            var config = ScriptableObject.CreateInstance<PlayerConfig>();
+            var weapon = ScriptableObject.CreateInstance<WeaponConfig>();
+            var fists = ScriptableObject.CreateInstance<WeaponConfig>();
+            var punch = ScriptableObject.CreateInstance<AttackConfig>();
+            var ammo = ScriptableObject.CreateInstance<AmmoConfig>();
+            try
+            {
+                fists.melee = punch;
+                weapon.capacity = 5;
+                weapon.compatibleAmmo = new[] { ammo };
+                config.fists = fists;
+                config.startingWeapons = new[] { fists, weapon };
+                config.startingReserve = new[] { new AmmoStack { ammo = ammo, count = 8 } };
+                var inventory = new Inventory(config);
+                inventory.Select(1);
+                var shotgun = inventory.Active;
+                int initial = inventory.Stock(ammo);
+                shotgun.Fire();
+                inventory.StartReload(0);
+                Assert.AreEqual(2, inventory.Slots.Length);
+                inventory.Select(0);
+                inventory.Tick(10);
+                Assert.AreSame(config.startingWeapons[0], inventory.Active.Config);
+                Assert.AreEqual(initial, inventory.Stock(ammo));
+                Assert.AreEqual(weapon.capacity - 1, shotgun.Loaded);
+                inventory.Select(1);
+                inventory.StartReload(11);
+                inventory.Tick(11 + shotgun.Config.reloadSeconds);
+                Assert.AreEqual(weapon.capacity, shotgun.Loaded);
+                Assert.AreEqual(initial - 1, inventory.Stock(ammo));
+                Assert.AreSame(shotgun, inventory.Drop());
+                Assert.AreSame(config.fists, inventory.Active.Config);
+                Assert.IsFalse(inventory.Add(ammo, int.MaxValue));
+                Assert.AreEqual(initial - 1, inventory.Stock(ammo));
+            }
+            finally
+            {
+                foreach (var asset in new ScriptableObject[] { config, weapon, fists, punch, ammo })
+                    Object.DestroyImmediate(asset);
+            }
         }
 
         [Test]

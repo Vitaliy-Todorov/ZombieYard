@@ -1,9 +1,13 @@
+// Ответственности
+// - Создаёт и анимирует видимый портал в заданной точке появления.
+
 using UnityEngine;
 
 namespace ZombieYard
 {
     public sealed class ZombiePortal : MonoBehaviour
     {
+        public bool IsUnderground { get; private set; }
         private Transform arch;
         private Light glow;
 
@@ -11,6 +15,7 @@ namespace ZombieYard
         {
             var portal = new GameObject(underground ? "Подземный портал" : "Портал за оградой")
                 .AddComponent<ZombiePortal>();
+            portal.IsUnderground = underground;
             portal.transform.SetParent(parent, false);
             portal.transform.position = feet;
             Color color = underground ? new Color(1, .16f, .08f) : new Color(.28f, 1, .52f);

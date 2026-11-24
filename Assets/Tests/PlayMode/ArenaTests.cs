@@ -1,3 +1,7 @@
+// Ответственности
+// - Проверяет доступ на арену, укрытия от лазера и лимиты порталов.
+// - Проверяет победу и запуск свежего цикла после подтверждения.
+
 using System.Collections;
 using System.Linq;
 using NUnit.Framework;
@@ -20,14 +24,15 @@ namespace ZombieYard.Tests
         [UnitySetUp]
         public IEnumerator OpenYard()
         {
-            yield return SceneManager.LoadSceneAsync("Yard");
-            yield return null;
-            scene = Object.FindAnyObjectByType<GameLifetimeScope>();
-            scene.points = System.Array.Empty<Transform>();
-            spawn = Object.Instantiate(scene.spawn);
-            scene.spawn = spawn;
-            spawn.limit = 0;
-            spawn.portalChance = 0;
+            yield return YardTestScene.Load(scope =>
+            {
+                scene = scope;
+                scene.points = System.Array.Empty<Transform>();
+                spawn = Object.Instantiate(scene.spawn);
+                scene.spawn = spawn;
+                spawn.limit = 0;
+                spawn.portalChance = 0;
+            });
         }
 
         [TearDown]
@@ -58,7 +63,7 @@ namespace ZombieYard.Tests
                 int dug = 0;
                 while (Physics.Linecast(outside + height, inside + height, out var hit))
                 {
-                    var block = Health.AtHit(hit);
+                    var block = YardChunk.ResolveHit(hit);
                     Assert.IsNotNull(block, "The mountain must be diggable from the yard side.");
                     block.Damage(block.Current, byPlayer: true);
                     Assert.Less(++dug, 10);
@@ -77,7 +82,7 @@ namespace ZombieYard.Tests
             Assert.AreEqual(Floor(0, 6).y, ledge.point.y, .01f);
             Assert.IsTrue(Physics.Raycast(Floor(2, 0) + Vector3.up, Vector3.up, out var roof));
             Assert.AreEqual(ArenaLayout.Roof * size, roof.point.y, .01f);
-            Assert.IsFalse(Player.Fog.Contains(Floor(0, 0) + Vector3.up * .1f));
+            Assert.IsFalse(Object.FindAnyObjectByType<ExteriorFog>().Contains(Floor(0, 0) + Vector3.up * .1f));
             var kits = Object.FindObjectsByType<Pickup>(FindObjectsSortMode.None)
                 .Where(p => p.Title == "Полная аптечка").ToArray();
             Assert.AreEqual(2, kits.Length);
@@ -96,10 +101,9 @@ namespace ZombieYard.Tests
             Move(Floor(6, 4));
             var origin = Eye.transform.position;
             Assert.IsTrue(Physics.Linecast(origin, Player.GetComponent<CharacterController>().bounds.center, out var face));
-            var cover = Health.AtHit(face);
+            var cover = YardChunk.ResolveHit(face);
             Assert.IsNotNull(cover);
-            Assert.AreEqual(240, cover.Maximum);
-            Assert.AreEqual(12, scene.world.eye.laser.damage);
+            Assert.AreEqual(scene.world.arenaPillar.hp, cover.Maximum);
             var beam = Eye.transform.Find("Луч");
             bool charged = false, chipped = false, cooled = false;
             float until = Time.time + 40;
@@ -178,7 +182,7 @@ namespace ZombieYard.Tests
             Player.Score.RecordKill(ZombieKind.Red);
             var pillarFeet = scene.grid.Cell(Floor(-4, 3));
             var cell = new Vector3Int(pillarFeet.x, YardGrid.YardLevel, pillarFeet.y);
-            scene.grid.HealthAt(cell).Damage(int.MaxValue);
+            scene.grid.GetOrCreateBlockHealth(cell).Damage(int.MaxValue);
             Eye.Health.Damage(Eye.Health.Maximum - 1);
             Player.Gear.Select(1);
             Player.transform.rotation = Quaternion.LookRotation(Vector3.right);
@@ -208,7 +212,7 @@ namespace ZombieYard.Tests
             Assert.AreEqual(scene.world.eye.hp, Eye.Health.Current);
             Assert.AreEqual(EyePhase.Dormant, Eye.Phase);
             Assert.AreEqual(0, ActivePortals);
-            Assert.AreEqual(scene.world.arenaPillar.hp, scene.grid.HealthAt(cell).Current);
+            Assert.AreEqual(scene.world.arenaPillar.hp, scene.grid.GetOrCreateBlockHealth(cell).Current);
         }
     }
 }

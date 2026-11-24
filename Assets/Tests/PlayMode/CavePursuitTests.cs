@@ -1,3 +1,7 @@
+// Ответственности
+// - Проверяет погоню в крытых проходах, на развилках и между этажами.
+// - Проверяет реакцию ходока на раскопку, препятствия и предельную высоту подъёма.
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -29,7 +33,7 @@ namespace ZombieYard.Tests
             yield return SceneManager.LoadSceneAsync("Yard");
             yield return null;
             scene = Object.FindAnyObjectByType<GameLifetimeScope>();
-            scene.points = Array.Empty<Transform>();
+            foreach (var point in scene.points) point.gameObject.SetActive(false);
             excavated.Clear();
             Time.timeScale = 2;
         }
@@ -43,7 +47,7 @@ namespace ZombieYard.Tests
             if (!excavated.Add(from + direction)) return;
             Vector3 origin = WorldPosition(from) + .5f * Size * Vector3.up;
             Assert.IsTrue(Physics.Raycast(origin, direction, out var hit, Size), $"No face at {from + direction}");
-            var block = Health.AtHit(hit);
+            var block = YardChunk.ResolveHit(hit);
             Assert.IsNotNull(block);
             block.Damage(block.Current);
         }
@@ -197,7 +201,7 @@ namespace ZombieYard.Tests
             Tunnel(shaft, Vector3Int.right, 3);
 
             // Seed the first air voxel directly to keep all six sides of this chamber sealed.
-            var seed = scene.grid.HealthAt(room + YardGrid.YardLevel * Vector3Int.up);
+            var seed = scene.grid.GetOrCreateBlockHealth(room + YardGrid.YardLevel * Vector3Int.up);
             seed.Damage(seed.Current);
             Dig(room, Vector3Int.up);
             Tunnel(room, Vector3Int.right, 2);
@@ -241,16 +245,15 @@ namespace ZombieYard.Tests
         [UnityTest]
         public IEnumerator WalkerGoesAroundShopCountersToReachPlayer()
         {
-            int floor = scene.grid.ShopFloorLevel;
-            // Open a gallery behind the row. Both ends now lead back into the shop.
+            var shop = scene.grid.Shop;
             for (int x = -3; x <= 3; x++)
-            for (int y = floor; y < floor + 2; y++)
+            for (int y = 0; y < 2; y++)
             {
-                var block = scene.grid.HealthAt(new Vector3Int(x, y, 3));
+                var block = scene.grid.GetOrCreateBlockHealth(shop.Cell(x, 3) + y * Vector3Int.up);
                 block.Damage(block.Current);
             }
-            MovePlayer(new Vector3Int(0, floor - YardGrid.YardLevel, 0));
-            SpawnWalker(new Vector3Int(0, floor - YardGrid.YardLevel, 3));
+            MovePlayer(shop.Cell(0, 0) - YardGrid.YardLevel * Vector3Int.up);
+            SpawnWalker(shop.Cell(0, 3) - YardGrid.YardLevel * Vector3Int.up);
             var body = walker.GetComponent<CapsuleCollider>();
             var colliders = new List<BoxCollider>();
             foreach (var stand in Object.FindObjectsByType<ShopStand>(FindObjectsSortMode.None))
@@ -259,7 +262,7 @@ namespace ZombieYard.Tests
             bool roundedEnd = false;
             yield return UntilHit(() =>
             {
-                roundedEnd |= Mathf.Abs(WalkerColumn.x) == 3 && WalkerColumn.y == 2;
+                roundedEnd |= Mathf.Abs(WalkerColumn.x - shop.Center.x) == 3 && WalkerColumn.y == shop.Center.y + 2;
                 foreach (var part in colliders)
                     Assert.IsFalse(Physics.ComputePenetration(body, walker.transform.position, walker.transform.rotation,
                         part, part.transform.position, part.transform.rotation, out _, out float depth) && depth > .005f,

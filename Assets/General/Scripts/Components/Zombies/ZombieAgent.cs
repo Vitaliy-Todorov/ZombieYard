@@ -1,3 +1,8 @@
+// Ответственности
+// - Ведёт ходока по маршруту, обрабатывает падение и ближний удар.
+// - Применяет параметры вида и анимирует движение модели.
+// - При смерти разыгрывает добычу и сообщает о гибели сервису спавна.
+
 using System;
 using UnityEngine;
 
@@ -24,6 +29,7 @@ namespace ZombieYard
             ZombieKind? kind = null)
         {
             config = settings;
+            foreach (var entry in config.loot) entry.Validate(config.name);
             Kind = kind ?? settings.kind;
             strength = Kind switch
             {
@@ -40,9 +46,7 @@ namespace ZombieYard
             grid = yard;
             player = target;
             onDeath = died;
-            var body = GetComponent<CapsuleCollider>().bounds;
-            heightCells = Mathf.CeilToInt(body.size.y / yard.Size);
-            radiusCells = Mathf.Max(0, Mathf.CeilToInt(body.extents.x / yard.Size - .5f));
+            (heightCells, radiusCells) = WalkerRoutes.BodyCells(GetComponent<CapsuleCollider>(), yard.Size);
             climbCells = Mathf.FloorToInt((config.maxClimbHeight + .001f) / yard.Size);
             Health = GetComponent<Health>();
             Health.Initialize(settings.hp * strength);
@@ -52,18 +56,18 @@ namespace ZombieYard
 
         private void Update()
         {
-            if (!player || player.Paused || player.Health.Current == 0 || !gameObject.activeSelf) return;
+            if (!player || !player.Playing) return;
             Vector3 delta = player.transform.position - transform.position;
             Vector3 flat = Vector3.ProjectOnPlane(delta, Vector3.up);
 
-            if (stepping && (!grid.WalkerSolid(source + Vector3Int.down) ||
-                             !grid.WalkerSolid(destination + Vector3Int.down)))
+            if (stepping && (!grid.Routes.WalkerSolid(source + Vector3Int.down) ||
+                             !grid.Routes.WalkerSolid(destination + Vector3Int.down)))
                 stepping = false;
 
             if (!stepping)
             {
-                bool grounded = grid.TryGround(transform.position, out source);
-                float floor = grounded ? source.y * grid.Size : grid.VoidHeight - 1;
+                bool grounded = grid.Routes.TryGround(transform.position, out source);
+                float floor = grounded ? grid.LevelY(source.y) : grid.VoidHeight - 1;
                 if (!grounded || transform.position.y > floor + .03f)
                 {
                     var feet = transform.position;
@@ -83,7 +87,7 @@ namespace ZombieYard
                     return;
                 }
 
-                if (!grid.TryGround(player.transform.position, out var target) ||
+                if (!grid.Routes.TryGround(player.transform.position, out var target) ||
                     !grid.Routes.NextStep(source, target, climbCells, heightCells, radiusCells, out destination)) return;
                 if (source == target)
                 {
@@ -92,13 +96,13 @@ namespace ZombieYard
                     return;
                 }
                 start = transform.position;
-                var goal = (Vector3)destination * grid.Size;
+                var goal = grid.WorldFeet(destination);
                 float distance = Vector3.ProjectOnPlane(goal - start, Vector3.up).magnitude + Mathf.Abs(goal.y - start.y);
                 duration = destination.y > source.y ? config.climbDuration : distance / config.speed;
                 stepTime = 0;
                 stepping = true;
             }
-            Vector3 end = (Vector3)destination * grid.Size;
+            Vector3 end = grid.WorldFeet(destination);
             // Follow the same two segments that the route checked for clearance.
             Vector3 corner = destination.y > source.y ? new Vector3(start.x, end.y, start.z)
                                                        : new Vector3(end.x, start.y, end.z);
@@ -137,12 +141,12 @@ namespace ZombieYard
             {
                 if (Kind < entry.minimumKind || entry.chance <= 0 || UnityEngine.Random.value > entry.chance) continue;
                 var position = transform.position + Vector3.up * .45f;
-                if (entry.weapon) Pickup.ForWeapon(new HeldWeapon(entry.weapon), position);
-                else if (entry.partialMedkit) Pickup.ForMedkit(player.config, false, position);
+                if (entry.weapon) Pickup.ForWeapon(new HeldWeapon(entry.weapon), position, grid.VoidHeight);
+                else if (entry.partialMedkit) Pickup.ForMedkit(player.config, false, position, grid.VoidHeight);
                 else if (entry.ammo)
                 {
                     int quantity = UnityEngine.Random.Range(entry.quantity.x, entry.quantity.y + 1);
-                    if (quantity > 0) Pickup.ForAmmo(entry.ammo, quantity, position);
+                    if (quantity > 0) Pickup.ForAmmo(entry.ammo, quantity, position, grid.VoidHeight);
                 }
             }
             onDeath(this);

@@ -1,3 +1,6 @@
+// Ответственности
+// - Задаёт исходную прочность и префаб блока.
+
 using UnityEngine;
 
 namespace ZombieYard

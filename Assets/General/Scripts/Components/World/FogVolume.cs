@@ -1,3 +1,7 @@
+// Ответственности
+// - Хранит количество тумана в клетках и рассчитывает его перетекание.
+// - Определяет заполнение в заданной точке и передаёт изменившиеся данные в текстуры.
+
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -80,7 +84,7 @@ namespace ZombieYard
         internal bool Contains(Vector3 position)
         {
             var column = grid.Cell(position);
-            float height = position.y / grid.Size;
+            float height = (position.y - grid.transform.position.y) / grid.Size;
             int y = Mathf.FloorToInt(height);
             return height - y < FillAt(new Vector3Int(column.x, y, column.y));
         }

@@ -39,7 +39,7 @@ namespace ZombieYard
             kick = Mathf.MoveTowards(kick, 0, Time.deltaTime / (shown.diggingMotion ? cycle : .25f));
             float bob = Mathf.Sin(elapsed * speed * 1.9f) * movement * .012f;
             float reach = sawing ? .012f * Mathf.Sin(Time.time * 94) : shown.diggingMotion ? .32f * Mathf.Sin(Mathf.PI * kick) : -kick * .09f;
-            float swing = shown.diggingMotion ? 0 : (shown.melee && shown.melee.contactRadius > 0 ? 3 : shown.melee ? 38 : -10) * kick;
+            float swing = shown.diggingMotion ? 0 : (shown.UsesContactAttack ? 3 : shown.melee ? 38 : -10) * kick;
             hand.localPosition = rest + new Vector3(bob, Mathf.Abs(bob) - (reloading ? .13f : 0), reach);
             hand.localRotation = Quaternion.Euler(swing + (reloading ? 24 : 0), -6, -3);
         }

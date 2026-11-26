@@ -152,21 +152,21 @@ namespace ZombieYard
             float speed = input["Sprint"].IsPressed() ? config.sprint : config.walk;
             Move((transform.right * move.x + transform.forward * move.y) * speed, input["Jump"].WasPressedThisFrame());
 
-            if (keys != null && keys.digit1Key.wasPressedThisFrame) Gear.Select(0);
-            else if (keys != null && keys.digit2Key.wasPressedThisFrame) Gear.Select(1);
+            if (input["SelectSlot1"].WasPressedThisFrame()) Gear.Select(0);
+            else if (input["SelectSlot2"].WasPressedThisFrame()) Gear.Select(1);
             else
             {
-                float wheel = Mouse.current?.scroll.ReadValue().y ?? 0;
+                float wheel = input["ScrollSlots"].ReadValue<float>();
                 int step = input["Next"].WasPressedThisFrame() || wheel < 0 ? 1 :
                     input["Previous"].WasPressedThisFrame() || wheel > 0 ? -1 : 0;
-                Gear.Select((Gear.Selected + step + Gear.Slots.Length) % Gear.Slots.Length);
+                Gear.Select((Gear.Selected + step + Gear.Slots.Count) % Gear.Slots.Count);
             }
             interaction.Update(input["Interact"].WasPressedThisFrame(), input["Drop"].WasPressedThisFrame());
             if (input["Reload"].WasPressedThisFrame()) Gear.StartReload(Time.time);
             var shown = Gear.Active.Config;
             weaponView.Show(shown);
             bool attacking = input["Attack"].IsPressed();
-            bool sawing = attacking && shown.melee && shown.melee.contactRadius > 0;
+            bool sawing = attacking && shown.UsesContactAttack;
             sounds.RunSaw(sawing);
             if (attacking) Attack();
             weaponView.Animate(Elapsed, speed, move.magnitude, sawing, Gear.Reloading);

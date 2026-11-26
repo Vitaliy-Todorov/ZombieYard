@@ -72,6 +72,24 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "SelectSlot1",
+                    "type": "Button",
+                    "id": "d0aaea28-b0eb-4aed-8319-6e61d12fd1a9",
+                    "expectedControlType": "Button"
+                },
+                {
+                    "name": "SelectSlot2",
+                    "type": "Button",
+                    "id": "93698aa4-6472-464e-b692-706178307ce0",
+                    "expectedControlType": "Button"
+                },
+                {
+                    "name": "ScrollSlots",
+                    "type": "Value",
+                    "id": "0efd6c6d-cdf1-4e7e-ab35-3badf8ae15a5",
+                    "expectedControlType": "Axis"
+                },
+                {
                     "name": "Previous",
                     "type": "Button",
                     "id": "2776c80d-3c14-4091-8c56-d04ced07a2b0",
@@ -100,6 +118,12 @@
                 }
             ],
             "bindings": [
+                {
+                    "id": "e8e7b934-301b-48a2-a7e1-00a682b2ed50",
+                    "path": "<Mouse>/scroll/y",
+                    "groups": "Keyboard&Mouse",
+                    "action": "ScrollSlots"
+                },
                 {
                     "id": "b6ef2220-a6f5-472d-873c-3daea39cd575",
                     "path": "<Keyboard>/r",
@@ -350,7 +374,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "Keyboard&Mouse",
-                    "action": "Next",
+                    "action": "SelectSlot2",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -438,7 +462,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "Keyboard&Mouse",
-                    "action": "Previous",
+                    "action": "SelectSlot1",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

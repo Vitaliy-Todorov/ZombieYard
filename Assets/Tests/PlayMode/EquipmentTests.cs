@@ -1,5 +1,5 @@
 // Ответственности
-// - Проверяет стартовую выкладку оружия, рикошеты посоха и контакт пилы.
+// - Проверяет стартовую выкладку, баланс ружья, рикошеты посоха и контакт пилы.
 // - Проверяет подбор аптечек и применение настройки лечения в новой попытке.
 
 using System.Collections;
@@ -36,6 +36,15 @@ namespace ZombieYard.Tests
             CollectionAssert.Contains(titles, scene.rifle.title);
             foreach (var absent in new[] { scene.staff.title, Chainsaw.title, "Малая аптечка", "Полная аптечка" })
                 CollectionAssert.DoesNotContain(titles, absent);
+        }
+
+        [Test]
+        public void SuppliedRifleHoldsOneRoundAndOutdamagesFullShotgunBlast()
+        {
+            var shotgun = Player.config.startingWeapons[1].compatibleAmmo[0];
+            var rifleRound = scene.rifle.compatibleAmmo[0];
+            Assert.AreEqual(1, scene.rifle.capacity);
+            Assert.Greater(rifleRound.damage, shotgun.damage * shotgun.projectiles);
         }
 
         private void Equip(WeaponConfig config)
@@ -201,12 +210,15 @@ namespace ZombieYard.Tests
         [UnityTest]
         public IEnumerator NewAttemptReadsChangedPartialHealingAndCapsItAtMaximum()
         {
-            var config = Player.config;
-            int original = config.partialHealing;
+            var config = Object.Instantiate(Player.config);
             try
             {
                 config.partialHealing = 7;
-                yield return OpenYard();
+                yield return YardTestScene.Load(scope =>
+                {
+                    scene = scope;
+                    scope.player.config = config;
+                });
                 var hp = Player.Health;
                 Assert.AreEqual(hp.Maximum, hp.Current);
                 hp.Damage(20);
@@ -220,7 +232,7 @@ namespace ZombieYard.Tests
                 Assert.AreEqual(hp.Maximum, hp.Current);
                 Assert.IsFalse(extra && extra.gameObject.activeSelf);
             }
-            finally { config.partialHealing = original; }
+            finally { Object.Destroy(config); }
         }
     }
 }

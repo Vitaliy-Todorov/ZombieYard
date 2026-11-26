@@ -136,16 +136,15 @@ namespace ZombieYard.Tests
         [UnityTest]
         public IEnumerator BothAmmoPacksReadPriceQuantityAndStockOnNewAttempt()
         {
-            var world = scene.world;
-            var original = world.shells;
-            var deal = original;
+            var world = Object.Instantiate(scene.world);
+            var deal = world.shells;
             deal.terms.price = 2;
             deal.terms.stock = 1;
             deal.pack.count = 9;
             try
             {
                 world.shells = deal;
-                yield return LoadYard();
+                yield return YardTestScene.Load(scope => { scene = scope; scope.world = world; });
                 yield return AtCounter(-2);
                 var stand = Player.AimedStand;
                 Assert.AreEqual(2, stand.Price);
@@ -168,12 +167,12 @@ namespace ZombieYard.Tests
                 yield return PressBuy();
                 Assert.AreEqual(before + rifle.pack.count, Player.Gear.Stock(rifle.pack.ammo));
                 Assert.AreEqual(0, Player.Score.Balance);
-                yield return LoadYard();
+                yield return YardTestScene.Load(scope => { scene = scope; scope.world = world; });
                 yield return AtCounter(-2);
                 Assert.AreEqual(1, Player.AimedStand.Remaining);
                 Assert.AreEqual(0, Player.Kills);
             }
-            finally { world.shells = original; }
+            finally { Object.Destroy(world); }
         }
 
         [UnityTest]

@@ -160,6 +160,13 @@ namespace ZombieYard.Tests
             spawn.limit = 1;
             yield return new WaitForSeconds(.6f);
             Assert.AreSame(first, Object.FindObjectsByType<ZombieAgent>(FindObjectsSortMode.None).Single());
+            // Every possible exit overlaps a solid collider when the replacement is due.
+            foreach (var portal in scene.grid.GetComponentsInChildren<ZombiePortal>())
+            {
+                var obstruction = portal.gameObject.AddComponent<BoxCollider>();
+                obstruction.center = Vector3.up;
+            }
+            Physics.SyncTransforms();
             first.Health.Damage(first.Health.Current);
             yield return new WaitForSeconds(.65f);
             Assert.AreNotSame(first, Object.FindObjectsByType<ZombieAgent>(FindObjectsSortMode.None).Single());

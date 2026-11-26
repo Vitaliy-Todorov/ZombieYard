@@ -1,15 +1,47 @@
 // Ответственности
-// - Проверяет спавн, выпадение добычи и сброс состояния после смерти игрока.
+// - Проверяет учёт спавна при ошибке конфига, выпадение добычи и сброс попытки.
 
 using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using VContainer;
 
 namespace ZombieYard.Tests
 {
     public sealed class SpawnCycleTests
     {
+        [UnityTest]
+        public IEnumerator InvalidLootRowLeavesSpawnCountAndSceneEmpty()
+        {
+            GameLifetimeScope scene = null;
+            ZombieSpawnerConfig spawn = null;
+            ZombieConfig walker = null;
+            try
+            {
+                LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("Invalid walker: loot row 2"));
+                yield return YardTestScene.Load(scope =>
+                {
+                    scene = scope;
+                    spawn = Object.Instantiate(scope.spawn);
+                    walker = Object.Instantiate(spawn.zombie);
+                    walker.name = "Invalid walker";
+                    walker.loot = new[] { walker.loot[0], new LootEntry() };
+                    spawn.zombie = walker;
+                    spawn.minInterval = spawn.maxInterval = .1f;
+                    scope.spawn = spawn;
+                });
+                yield return new WaitForSeconds(.3f);
+                Assert.AreEqual(0, scene.Container.Resolve<ZombieSpawnService>().Alive);
+                Assert.IsNull(Object.FindAnyObjectByType<ZombieAgent>());
+            }
+            finally
+            {
+                Object.Destroy(walker);
+                Object.Destroy(spawn);
+            }
+        }
+
         [UnityTest]
         public IEnumerator SpawnLimitClimbLootAndDeath()
         {

@@ -13,7 +13,7 @@ namespace ZombieYard
         public readonly WeaponConfig Config;
         public AmmoConfig Ammo { get; private set; }
         public int Loaded { get; private set; }
-        public float NextUse;
+        private float nextUse;
         public HeldWeapon(WeaponConfig config)
         {
             config.ValidateLoadout();
@@ -23,8 +23,21 @@ namespace ZombieYard
             Loaded = config.capacity;
         }
 
-        public void Fire() => Loaded--;
-        public void Load(AmmoConfig ammo, int quantity)
+        internal bool TryStartUse(float now)
+        {
+            if (now < nextUse) return false;
+            nextUse = now + Config.delay;
+            return true;
+        }
+
+        public bool TryConsumeRound()
+        {
+            if (Loaded == 0) return false;
+            Loaded--;
+            return true;
+        }
+
+        internal void Load(AmmoConfig ammo, int quantity)
         {
             Ammo = ammo;
             Loaded += quantity;
@@ -33,17 +46,18 @@ namespace ZombieYard
 
     public sealed class Inventory
     {
-        public readonly HeldWeapon[] Slots;
+        private readonly HeldWeapon[] slots = new HeldWeapon[PlayerConfig.WeaponSlots];
+        public IReadOnlyList<HeldWeapon> Slots { get; }
         private readonly HeldWeapon fists;
         private readonly Dictionary<AmmoConfig, int> reserve = new();
         public int Selected { get; private set; }
-        public HeldWeapon Active => Slots[Selected] ?? fists;
+        public HeldWeapon Active => slots[Selected] ?? fists;
         public bool Reloading { get; private set; }
         private float reloadEnds;
 
         public Inventory(PlayerConfig config)
         {
-            Slots = new HeldWeapon[PlayerConfig.WeaponSlots];
+            Slots = Array.AsReadOnly(slots);
             fists = new HeldWeapon(config.fists);
             foreach (var weapon in config.startingWeapons)
                 if (weapon) Take(new HeldWeapon(weapon));
@@ -52,7 +66,7 @@ namespace ZombieYard
 
         public void Select(int index)
         {
-            if (index < 0 || index >= Slots.Length || index == Selected) return;
+            if (index < 0 || index >= slots.Length || index == Selected) return;
             Selected = index;
             Reloading = false;
         }
@@ -69,16 +83,16 @@ namespace ZombieYard
 
         public bool Take(HeldWeapon weapon)
         {
-            int index = Array.IndexOf(Slots, null);
+            int index = Array.IndexOf(slots, null);
             if (index < 0) return false;
-            Slots[index] = weapon;
+            slots[index] = weapon;
             return true;
         }
 
         public HeldWeapon Drop()
         {
-            var weapon = Slots[Selected];
-            Slots[Selected] = null;
+            var weapon = slots[Selected];
+            slots[Selected] = null;
             Reloading = false;
             return weapon;
         }

@@ -34,9 +34,8 @@ namespace ZombieYard
         internal void Attack()
         {
             var held = gear.Active;
-            if (gear.Reloading || Time.time < held.NextUse) return;
-            held.NextUse = Time.time + held.Config.delay;
-            if (held.Config.UsesAmmo && held.Loaded == 0)
+            if (gear.Reloading || !held.TryStartUse(Time.time)) return;
+            if (held.Config.UsesAmmo && !held.TryConsumeRound())
             {
                 gear.StartReload(Time.time);
                 if (!gear.Reloading) notice("Нет патронов");
@@ -46,7 +45,7 @@ namespace ZombieYard
             var view = eyes;
             if (held.Config.melee)
             {
-                if (held.Config.melee.contactRadius > 0)
+                if (held.Config.UsesContactAttack)
                 {
                     SawContact(view, held.Config.melee);
                     return;
@@ -61,7 +60,6 @@ namespace ZombieYard
                 return;
             }
             sounds.Play(YardCue.Shot);
-            if (held.Config.UsesAmmo) held.Fire();
             var ammo = held.Config.staffBolt ? held.Config.staffBolt : held.Ammo;
             weaponView.Show(held.Config);
             var start = weaponView.Muzzle;

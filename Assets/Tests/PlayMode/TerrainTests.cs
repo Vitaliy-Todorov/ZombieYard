@@ -14,10 +14,15 @@ namespace ZombieYard.Tests
         [UnityTest]
         public IEnumerator NewAttemptReadsUpdatedWorldBalanceAndRestoresGround()
         {
-            yield return SceneManager.LoadSceneAsync("Yard");
-            yield return null;
-            var scene = Object.FindAnyObjectByType<GameLifetimeScope>();
-            var config = scene.world;
+            GameLifetimeScope scene = null;
+            WorldConfig config = null;
+            yield return YardTestScene.Load(scope =>
+            {
+                scene = scope;
+                config = Object.Instantiate(scope.world);
+                config.soil = Object.Instantiate(config.soil);
+                scope.world = config;
+            });
             int originalHp = config.soil.hp;
             int originalHeight = config.plateauHeight;
             float yardHeight = YardGrid.YardLevel * scene.grid.Size;
@@ -32,9 +37,11 @@ namespace ZombieYard.Tests
                 block.Damage(block.Current);
                 Assert.Less(scene.grid.Height(Vector2Int.zero), yardHeight);
 
-                yield return SceneManager.LoadSceneAsync("Yard");
-                yield return null;
-                scene = Object.FindAnyObjectByType<GameLifetimeScope>();
+                yield return YardTestScene.Load(scope =>
+                {
+                    scene = scope;
+                    scope.world = config;
+                });
                 Assert.AreEqual(yardHeight, scene.grid.Height(Vector2Int.zero));
                 Assert.IsTrue(Physics.Raycast(origin, Vector3.down, out hit, 4));
                 Assert.AreEqual(originalHp + 17, YardChunk.ResolveHit(hit).Current);
@@ -43,8 +50,8 @@ namespace ZombieYard.Tests
             }
             finally
             {
-                config.soil.hp = originalHp;
-                config.plateauHeight = originalHeight;
+                Object.Destroy(config.soil);
+                Object.Destroy(config);
             }
         }
 

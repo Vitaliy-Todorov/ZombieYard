@@ -1,5 +1,5 @@
 // Ответственности
-// - Проверяет подбор, выброс оружия и перемещение игрока через ввод в Yard.
+// - Проверяет привязки слотов, подбор, выброс оружия и движение с заданной скоростью через ввод в Yard.
 
 using System.Collections;
 using NUnit.Framework;
@@ -13,6 +13,109 @@ namespace ZombieYard.Tests
 {
     public sealed class YardPlayTests
     {
+#if UNITY_EDITOR
+        private InputSettings.BackgroundBehavior previousBackground;
+        private InputSettings.EditorInputBehaviorInPlayMode previousRouting;
+
+        [SetUp]
+        public void RouteTestInput()
+        {
+            previousBackground = InputSystem.settings.backgroundBehavior;
+            previousRouting = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+        }
+
+        [TearDown]
+        public void RestoreInputRouting()
+        {
+            InputSystem.settings.editorInputBehaviorInPlayMode = previousRouting;
+            InputSystem.settings.backgroundBehavior = previousBackground;
+        }
+#endif
+
+        [UnityTest]
+        public IEnumerator ReboundKeySelectsSlotDirectly()
+        {
+            YardPlayer player = null;
+            InputActionAsset controls = null;
+            var keys = InputSystem.AddDevice<Keyboard>();
+            try
+            {
+                yield return YardTestScene.Load(scope =>
+                {
+                    player = scope.player;
+                    controls = Object.Instantiate(player.controls);
+                    controls.FindAction("Player/SelectSlot2", true).ChangeBinding(0).WithPath("<Keyboard>/f2");
+                    player.controls = controls;
+                });
+                IEnumerator Press(Key key)
+                {
+                    InputSystem.QueueStateEvent(keys, new KeyboardState(key));
+                    yield return null;
+                    yield return null;
+                    InputSystem.QueueStateEvent(keys, new KeyboardState());
+                    yield return null;
+                }
+                yield return Press(Key.Digit2);
+                Assert.AreEqual(0, player.Gear.Selected);
+                yield return Press(Key.F2);
+                Assert.AreEqual(1, player.Gear.Selected);
+                yield return Press(Key.F2);
+                Assert.AreEqual(1, player.Gear.Selected);
+                yield return Press(Key.Digit1);
+                Assert.AreEqual(0, player.Gear.Selected);
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(keys);
+                Object.Destroy(controls);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator WalkingAndSprintingUseConfiguredSpeeds()
+        {
+            YardPlayer player = null;
+            PlayerConfig config = null;
+            float previousDelta = Time.captureDeltaTime;
+            var keys = InputSystem.AddDevice<Keyboard>();
+            try
+            {
+                yield return YardTestScene.Load(scope =>
+                {
+                    player = scope.player;
+                    config = Object.Instantiate(player.config);
+                    config.walk = .12f;
+                    config.sprint = 3f;
+                    player.config = config;
+                });
+                IEnumerator CheckSpeed(KeyboardState state, float expectedSpeed)
+                {
+                    InputSystem.QueueStateEvent(keys, state);
+                    yield return null;
+                    yield return null;
+                    Vector3 start = player.transform.position;
+                    float started = player.Elapsed;
+                    for (int frame = 0; frame < 30; frame++) yield return null;
+                    Assert.Greater(player.Elapsed, started);
+                    var travelled = Vector3.ProjectOnPlane(player.transform.position - start, Vector3.up);
+                    Assert.AreEqual(expectedSpeed * (player.Elapsed - started), travelled.magnitude, .001f);
+                }
+                // Each walking frame covers half a millimetre at this configured speed.
+                Time.captureDeltaTime = 1f / 240;
+                yield return CheckSpeed(new KeyboardState(Key.W), config.walk);
+                Time.captureDeltaTime = 1f / 60;
+                yield return CheckSpeed(new KeyboardState(Key.W, Key.LeftShift), config.sprint);
+            }
+            finally
+            {
+                Time.captureDeltaTime = previousDelta;
+                InputSystem.RemoveDevice(keys);
+                Object.Destroy(config);
+            }
+        }
+
         [UnityTest]
         public IEnumerator DropAndRetrieveSelectedWeaponUsingGameControls()
         {
@@ -22,15 +125,8 @@ namespace ZombieYard.Tests
             var gear = player.Gear;
             gear.Select(1);
             var shotgun = gear.Active;
-            shotgun.Fire();
+            Assert.IsTrue(shotgun.TryConsumeRound());
             gear.StartReload(Time.time);
-#if UNITY_EDITOR
-            // The Test Runner can run with an unfocused Game View.
-            var previousBackground = InputSystem.settings.backgroundBehavior;
-            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
-            var previousRouting = InputSystem.settings.editorInputBehaviorInPlayMode;
-            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
-#endif
             var keys = InputSystem.AddDevice<Keyboard>();
             try
             {
@@ -70,10 +166,6 @@ namespace ZombieYard.Tests
             finally
             {
                 InputSystem.RemoveDevice(keys);
-#if UNITY_EDITOR
-                InputSystem.settings.editorInputBehaviorInPlayMode = previousRouting;
-                InputSystem.settings.backgroundBehavior = previousBackground;
-#endif
             }
         }
 
@@ -99,7 +191,7 @@ namespace ZombieYard.Tests
             Assert.AreEqual(reserve + 4, gear.Stock(ammo));
             Assert.IsFalse(rounds && rounds.gameObject.activeSelf);
             Assert.IsTrue(weapon.gameObject.activeSelf);
-            Assert.AreEqual(2, gear.Slots.Length);
+            Assert.AreEqual(2, gear.Slots.Count);
             Assert.IsFalse(weapon.Collect(gear));
         }
 

@@ -29,7 +29,6 @@ namespace ZombieYard
             ZombieKind? kind = null)
         {
             config = settings;
-            foreach (var entry in config.loot) entry.Validate(config.name);
             Kind = kind ?? settings.kind;
             strength = Kind switch
             {

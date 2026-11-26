@@ -29,6 +29,7 @@ namespace ZombieYard
 
         internal void Begin(ZombieSpawnerConfig settings, Transform[] points, YardGrid grid, YardPlayer player, ArenaEye eye)
         {
+            settings.zombie.ValidateLoot();
             this.settings = settings;
             this.grid = grid;
             this.player = player;
@@ -107,8 +108,7 @@ namespace ZombieYard
                     arenaRemaining = settings.arenaInterval;
                     if (Alive < settings.limit && arenaLiving.Count < settings.arenaLimit)
                     {
-                        var exit = FreeExit(arena);
-                        if (exit) arenaLiving.Add(Spawn(exit.position, exit.rotation, ZombieKind.Normal));
+                        arenaLiving.Add(SpawnFromPortal(arena, ZombieKind.Normal));
                     }
                 }
                 return;
@@ -138,37 +138,31 @@ namespace ZombieYard
 
         private void SpawnUnderground()
         {
-            var exit = FreeExit(underground);
-            if (!exit) return;
             float chance = settings.purpleChance;
             var kind = chance > 0 && Random.value <= chance ? ZombieKind.Purple : ZombieKind.Red;
-            undergroundLiving.Add(Spawn(exit.position, exit.rotation, kind));
+            undergroundLiving.Add(SpawnFromPortal(underground, kind));
         }
 
-        private Transform FreeExit(List<ZombiePortal> portals)
+        private ZombieAgent SpawnFromPortal(List<ZombiePortal> portals, ZombieKind kind)
         {
-            var (height, radius) = WalkerRoutes.BodySize(body);
-            var offset = Vector3.Scale(body.center, body.transform.lossyScale);
-            var halfSegment = Vector3.up * (height / 2 - radius);
-            int start = Random.Range(0, portals.Count);
-            for (int i = 0; i < portals.Count; i++)
-            {
-                var portal = portals[(start + i) % portals.Count].transform;
-                var feet = portal.position;
-                // Leave a small skin above the supporting mesh. Occupied exits retry next interval.
-                var center = feet + portal.rotation * offset;
-                if (Physics.CheckCapsule(center - halfSegment, center + halfSegment, Mathf.Max(.001f, radius - .005f),
-                    Physics.AllLayers, QueryTriggerInteraction.Ignore)) continue;
-                return portal;
-            }
-            return null;
+            var exit = portals[Random.Range(0, portals.Count)].transform;
+            return Spawn(exit.position, exit.rotation, kind);
         }
 
         private ZombieAgent Spawn(Vector3 position, Quaternion rotation, ZombieKind kind)
         {
             var zombie = Object.Instantiate(settings.prefab, position, rotation);
+            try
+            {
+                zombie.Initialize(settings.zombie, grid, player, OnDeath, kind);
+            }
+            catch
+            {
+                zombie.gameObject.SetActive(false);
+                Object.Destroy(zombie.gameObject);
+                throw;
+            }
             living.Add(zombie);
-            zombie.Initialize(settings.zombie, grid, player, OnDeath, kind);
             return zombie;
         }
 

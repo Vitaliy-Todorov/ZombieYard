@@ -1,5 +1,5 @@
 // Ответственности
-// - Проверяет приём патронов, расход запаса при перезарядке и отмену при смене слота.
+// - Проверяет расход магазина, приём патронов, перезарядку и её отмену при смене слота.
 // - Проверяет предел лечения и однократное событие смерти.
 
 using NUnit.Framework;
@@ -29,9 +29,9 @@ namespace ZombieYard.Tests
                 inventory.Select(1);
                 var shotgun = inventory.Active;
                 int initial = inventory.Stock(ammo);
-                shotgun.Fire();
+                Assert.IsTrue(shotgun.TryConsumeRound());
                 inventory.StartReload(0);
-                Assert.AreEqual(2, inventory.Slots.Length);
+                Assert.AreEqual(2, inventory.Slots.Count);
                 inventory.Select(0);
                 inventory.Tick(10);
                 Assert.AreSame(config.startingWeapons[0], inventory.Active.Config);
@@ -51,6 +51,27 @@ namespace ZombieYard.Tests
             {
                 foreach (var asset in new ScriptableObject[] { config, weapon, fists, punch, ammo })
                     Object.DestroyImmediate(asset);
+            }
+        }
+
+        [Test]
+        public void EmptyMagazineRefusesToSpendAnotherRound()
+        {
+            var weapon = ScriptableObject.CreateInstance<WeaponConfig>();
+            var ammo = ScriptableObject.CreateInstance<AmmoConfig>();
+            try
+            {
+                weapon.capacity = 1;
+                weapon.compatibleAmmo = new[] { ammo };
+                var held = new HeldWeapon(weapon);
+                Assert.IsTrue(held.TryConsumeRound());
+                Assert.IsFalse(held.TryConsumeRound());
+                Assert.AreEqual(0, held.Loaded);
+            }
+            finally
+            {
+                Object.DestroyImmediate(weapon);
+                Object.DestroyImmediate(ammo);
             }
         }
 

@@ -27,6 +27,7 @@ namespace ZombieYard
                 throw new System.InvalidOperationException($"{name}: a firearm needs capacity and compatible ammunition.");
         }
 
+        public bool UsesContactAttack => melee && melee.contactRadius > 0;
         public bool UsesAmmo => melee == null && staffBolt == null;
     }
 }

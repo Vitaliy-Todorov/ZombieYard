@@ -1,5 +1,5 @@
 // Ответственности
-// - Проверяет условия открытия подземных порталов и общий лимит с поверхностью.
+// - Проверяет открытие подземных порталов, появление при занятом выходе и общий лимит с поверхностью.
 // - Проверяет погоню, добычу и награды подземных видов зомби.
 
 using System;
@@ -149,6 +149,26 @@ namespace ZombieYard.Tests
         }
 
         [UnityTest]
+        public IEnumerator UndergroundPortalSpawnsWithAmmoLyingInExit()
+        {
+            foreach (var point in scene.points) point.gameObject.SetActive(false);
+            spawn.purpleChance = 0;
+            var cell = new Vector3Int(-3, TunnelLevel, 3);
+            Dig(cell + Vector3Int.up);
+            Dig(cell);
+            var exit = Underground.Single().transform.position;
+            var ammo = Pickup.ForAmmo(scene.world.shells.pack.ammo, 1, exit + Vector3.up * .2f, Grid.VoidHeight);
+            Physics.SyncTransforms();
+
+            yield return new WaitForSeconds(spawn.undergroundMaxInterval * 2);
+            var zombie = Object.FindAnyObjectByType<ZombieAgent>();
+            Assert.IsNotNull(zombie, "A loose ammo pack must leave the portal usable.");
+            Assert.AreEqual(ZombieKind.Red, zombie.Kind);
+            Assert.AreEqual(Grid.Cell(exit), Grid.Cell(zombie.transform.position));
+            Assert.IsTrue(ammo && ammo.gameObject.activeInHierarchy);
+        }
+
+        [UnityTest]
         public IEnumerator UndergroundVariantsPursueDropLootAndAwardPoints()
         {
             foreach (var point in scene.points) point.gameObject.SetActive(false);
@@ -173,9 +193,6 @@ namespace ZombieYard.Tests
             Dig(start);
             var portal = Underground.Single();
             MovePlayer(portal.transform.position);
-            yield return new WaitForSeconds(.9f);
-            Assert.IsNull(Object.FindAnyObjectByType<ZombieAgent>(), "The player is standing in the exit.");
-            MovePlayer(Grid.Center(Vector2Int.zero));
 
             foreach (var kind in new[] { ZombieKind.Red, ZombieKind.Purple })
             {

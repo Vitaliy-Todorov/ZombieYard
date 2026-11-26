@@ -60,10 +60,10 @@ namespace ZombieYard
             Fill(36, h - 43, 154, 7, new Color(.24f,.27f,.23f));
             Fill(36, h - 43, 154f * hp.Current / hp.Maximum, 7, hp.Current > hp.Maximum / 3 ? Amber : Rust);
 
-            float slotWidth = Mathf.Min(122, (w - 258) / gear.Slots.Length);
-            for (int i = 0; i < gear.Slots.Length; i++)
+            float slotWidth = Mathf.Min(122, (w - 258) / gear.Slots.Count);
+            for (int i = 0; i < gear.Slots.Count; i++)
             {
-                float x = w - 22 - (gear.Slots.Length - i) * slotWidth;
+                float x = w - 22 - (gear.Slots.Count - i) * slotWidth;
                 bool selected = gear.Selected == i;
                 Fill(x, h - 69, slotWidth - 3, 47, Ink);
                 if (selected) Fill(x, h - 69, slotWidth - 3, 3, Amber);

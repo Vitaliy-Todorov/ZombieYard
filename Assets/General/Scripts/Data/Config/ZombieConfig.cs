@@ -16,10 +16,10 @@ namespace ZombieYard
         [Range(0, 1)] public float chance;
         public Vector2Int quantity;
 
-        internal void Validate(string owner)
+        internal void Validate(string owner, int row)
         {
             if ((ammo ? 1 : 0) + (weapon ? 1 : 0) + (partialMedkit ? 1 : 0) != 1)
-                throw new System.InvalidOperationException($"{owner}: a loot entry must grant exactly one item.");
+                throw new System.InvalidOperationException($"{owner}: loot row {row} must grant exactly one item.");
         }
     }
 
@@ -34,5 +34,11 @@ namespace ZombieYard
         [Min(1)] public float turnSpeed = 540;
         public WeaponConfig weapon;
         public LootEntry[] loot;
+
+        internal void ValidateLoot()
+        {
+            for (int i = 0; i < loot.Length; i++)
+                loot[i].Validate(name, i + 1);
+        }
     }
 }
